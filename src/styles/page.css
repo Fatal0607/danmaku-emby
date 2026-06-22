@@ -1,0 +1,82 @@
+/* Shared page scaffolding for in-shell screens. */
+.page {
+  min-height: 100%;
+  padding: 64px 48px 80px;
+}
+.page-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  gap: 20px;
+}
+.page-eyebrow {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+.page-title {
+  font-size: var(--text-h1);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+/* search field in topbar */
+.topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline-strong);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  width: 280px;
+  cursor: text;
+}
+
+/* content rows */
+.content-row {
+  margin-bottom: 44px;
+}
+.row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.row-title {
+  font-size: var(--text-h2);
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+.row-more {
+  font-size: var(--text-sm);
+  color: var(--accent-bright);
+}
+.row-rail {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+
+/* grid */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 28px 24px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}

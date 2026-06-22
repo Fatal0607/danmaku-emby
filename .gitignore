@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-electron/
+
+# Local tooling / editor
+.claude/
+.DS_Store
+*.log

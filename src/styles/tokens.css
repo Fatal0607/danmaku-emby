@@ -1,0 +1,160 @@
+:root {
+  /* ---- Color tokens (cinema-dark + electric indigo) ---- */
+  --bg: oklch(14% 0.02 260);
+  --bg-deep: oklch(11% 0.018 260);
+  --bg-elevated: oklch(18% 0.02 260);
+  --surface-1: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --surface-3: rgba(255, 255, 255, 0.1);
+
+  --glass: rgba(12, 15, 22, 0.62);
+  --glass-strong: rgba(10, 13, 19, 0.66);
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.12);
+
+  --accent: oklch(65% 0.19 255);
+  --accent-bright: #5b9bff;
+  --accent-2: #7a5bff;
+  --accent-grad: linear-gradient(180deg, #4a8cff, #2f6bf0);
+  --accent-grad-brand: linear-gradient(135deg, #3a82f7, #7a5bff);
+
+  --text: oklch(96% 0 0);
+  --text-strong: #f4f5f7;
+  --text-soft: #c8cdd5;
+  --text-muted: #9aa3af;
+  --text-tertiary: #7a828f;
+  --text-faint: #5b6470;
+
+  --success: #1fc77c;
+  --warning: #f0b042;
+  --error: #f04438;
+
+  /* macOS traffic lights */
+  --tl-red: #ff5f57;
+  --tl-yellow: #febc2e;
+  --tl-green: #28c840;
+
+  /* ---- Type scale ---- */
+  --font-sans: -apple-system, 'SF Pro Text', 'SF Pro Display', 'PingFang SC',
+    system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --text-display: 38px;
+  --text-h1: 34px;
+  --text-h2: 22px;
+  --text-body: 14px;
+  --text-sm: 13px;
+  --text-xs: 11px;
+
+  /* ---- Radii ---- */
+  --r-card: 12px;
+  --r-panel: 16px;
+  --r-btn: 9px;
+  --r-pill: 999px;
+
+  /* ---- Spacing ---- */
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 20px;
+  --space-5: 32px;
+  --space-6: 48px;
+
+  /* ---- Motion ---- */
+  --dur-fast: 150ms;
+  --dur-normal: 280ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- Elevation ---- */
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --shadow-panel: 0 40px 100px rgba(0, 0, 0, 0.6);
+  --shadow-accent: 0 6px 20px rgba(58, 130, 247, 0.45);
+  --glow-accent: 0 0 14px rgba(58, 130, 247, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-strong);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 130, 145, 0.45);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@keyframes dm-scroll {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes accent-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(58, 130, 247, 0.45), 0 8px 30px rgba(58, 130, 247, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(58, 130, 247, 0), 0 10px 38px rgba(58, 130, 247, 0.5);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -460px 0;
+  }
+  to {
+    background-position: 460px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

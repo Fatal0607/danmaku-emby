@@ -1,0 +1,48 @@
+.danmaku-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+.dm-comment {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.9);
+  will-change: transform;
+}
+.dm-scroll {
+  left: 100%;
+  animation-name: dm-fly;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes dm-fly {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100vw - 100%));
+  }
+}
+.dm-fixed {
+  left: 50%;
+  transform: translateX(-50%);
+  animation: dm-fade 4s linear forwards;
+}
+.dm-top {
+  top: 14px;
+}
+.dm-bottom {
+  bottom: 90px;
+}
+@keyframes dm-fade {
+  0%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

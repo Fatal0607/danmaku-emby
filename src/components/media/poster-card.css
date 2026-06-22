@@ -1,0 +1,134 @@
+.poster-card {
+  flex: none;
+  cursor: pointer;
+}
+.poster-art {
+  position: relative;
+  border-radius: var(--r-card);
+  border: 1px solid var(--hairline-strong);
+  overflow: hidden;
+  transition: transform var(--dur-normal) var(--ease-out-expo),
+    box-shadow var(--dur-normal) var(--ease-out-expo);
+}
+.poster-card:hover .poster-art {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(58, 130, 247, 0.4);
+}
+.poster-card:focus-visible .poster-art {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.dm-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+.dm-matched {
+  background: rgba(31, 199, 124, 0.2);
+  border: 1px solid rgba(31, 199, 124, 0.45);
+  color: #7fecbb;
+}
+.dm-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+.dm-matching {
+  background: rgba(240, 176, 66, 0.2);
+  border: 1px solid rgba(240, 176, 66, 0.45);
+  color: #f5c976;
+}
+.dm-unmatched {
+  background: rgba(10, 13, 18, 0.55);
+  border: 1px solid var(--hairline-strong);
+  color: var(--text-muted);
+}
+.quality-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(10, 13, 18, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--hairline);
+  color: var(--text-soft);
+}
+
+.poster-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.5));
+  opacity: 0;
+  transition: opacity var(--dur-normal) var(--ease-out-expo);
+}
+.poster-card:hover .poster-overlay {
+  opacity: 1;
+}
+.poster-play {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-grad);
+  box-shadow: var(--shadow-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 3px;
+  transform: scale(0.8);
+  transition: transform var(--dur-normal) var(--ease-out-expo);
+}
+.poster-card:hover .poster-play {
+  transform: scale(1);
+}
+
+.poster-progress {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+.poster-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #3a82f7, #5b9bff);
+}
+
+.poster-info {
+  margin-top: 10px;
+}
+.poster-title {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.poster-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}

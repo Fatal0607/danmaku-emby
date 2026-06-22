@@ -1,0 +1,71 @@
+.hero {
+  position: relative;
+  border-radius: var(--r-panel);
+  overflow: hidden;
+  border: 1px solid var(--hairline-strong);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  margin-bottom: 52px;
+  min-height: 380px;
+}
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 140% at 85% 10%, transparent 30%, rgba(6, 8, 12, 0.55) 70%),
+    linear-gradient(90deg, rgba(6, 8, 12, 0.92) 0%, rgba(6, 8, 12, 0.5) 45%, transparent 75%);
+}
+.hero-body {
+  position: relative;
+  max-width: 560px;
+  padding: 48px 52px;
+}
+.hero-tags {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.hero-title {
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0 0 14px;
+  line-height: 1.04;
+}
+.hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: var(--text-sm);
+  color: var(--text-soft);
+  margin-bottom: 16px;
+}
+.hero-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: #f5c976;
+}
+.hero-overview {
+  font-size: var(--text-body);
+  line-height: 1.65;
+  color: var(--text-soft);
+  margin: 0 0 26px;
+}
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.hero-progress {
+  width: 240px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.hero-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #3a82f7, #5b9bff);
+}

@@ -1,0 +1,75 @@
+.dm-settings {
+  position: absolute;
+  right: 24px;
+  bottom: 104px;
+  width: 320px;
+  padding: 20px;
+  border-radius: var(--r-panel);
+  background: rgba(12, 15, 22, 0.78);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-panel);
+  z-index: 30;
+  animation: dm-settings-in var(--dur-normal) var(--ease-out-expo);
+}
+@keyframes dm-settings-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.dm-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.dm-settings-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.dm-settings-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--surface-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dm-settings-close:hover {
+  background: var(--surface-2);
+}
+.dm-settings-row {
+  margin-bottom: 18px;
+}
+.dm-settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dm-settings-label {
+  font-size: var(--text-sm);
+  color: var(--text-soft);
+  font-weight: 500;
+}
+.dm-settings-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+.dm-settings-divider {
+  height: 1px;
+  background: var(--hairline);
+  margin: 4px 0 18px;
+}
