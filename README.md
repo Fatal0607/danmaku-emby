@@ -7,10 +7,11 @@ This repo implements the high-fidelity design `DanmakuEmby.dc.html` (cinema-dark
 ## Run
 
 ```bash
-npm install
-npm run dev          # Vite dev server (browser preview)
+npm install          # builds the better-sqlite3 native module
+npm run dev          # Vite dev server (browser preview, mock data)
 npm run electron:dev # build + launch the Electron window
 npm run build        # typecheck + production bundle
+npm test             # Vitest unit suite (Main-process modules)
 ```
 
 ## What's implemented
@@ -43,9 +44,42 @@ electron/                 # minimal main + preload wrapper
 
 Design tokens (palette, type scale, radii, motion) live in [`src/styles/tokens.css`](src/styles/tokens.css).
 
+### Main process (`electron/main/`)
+
+Phase-1 backbone per [`docs/system-design/`](docs/system-design/), unit-tested with Vitest:
+
+```
+electron/main/
+├── AppServices.ts            # composition root (Store + Secrets + EmbyService)
+├── emby/
+│   ├── EmbyService.ts        # auth, browse, search, PlaybackInfo→PlaybackSource, progress
+│   ├── DeviceProfileBuilder.ts  # permissive mpv profile → AC3/DTS/HEVC direct-play
+│   └── types.ts              # raw Emby API shapes
+├── net/FetchLike.ts          # injectable network layer
+├── player/
+│   ├── PlayerEngine.ts       # engine interface + mpv/html5 capability sets
+│   └── MpvEngine.ts          # libmpv binding site (Spike A — not yet native)
+├── danmaku/render/
+│   ├── parseComment.ts       # {p,m} parsing, BGR color, ASS escaping
+│   └── toAss.ts              # {p,m} → ASS with lane allocation (mpv L1)
+├── store/                    # better-sqlite3 db + migrations + repositories
+│   └── repositories/         # servers, kv (meta/prefs), danmaku map + cache
+├── secret/SecretService.ts   # safeStorage (Keychain) token storage
+└── ipc/registerEmbyIpc.ts    # IpcResult envelope + error-code mapping
+```
+
+The preload exposes a typed, whitelisted `window.api.emby` bridge; the renderer client
+(`src/lib/ipc.ts`) unwraps the `IpcResult` envelope and falls back to mock data in the browser.
+
 ## Status
 
-UI layer is complete and runs on **mock data** (`src/lib/mockData.ts`). The Main-process services
-(EmbyService, DanmakuService, PlayerController with libmpv, SQLite store) described in
-[`docs/system-design/`](docs/system-design/) are not yet wired — the preload bridge is a typed
-placeholder ready for those IPC namespaces.
+| Area | State |
+|---|---|
+| UI (9 screens, design system) | ✅ complete, runs on mock data |
+| Emby integration + SQLite + Keychain + secure IPC | ✅ implemented, unit-tested |
+| `toAss` danmaku→ASS converter, DeviceProfileBuilder | ✅ implemented, unit-tested |
+| Wire renderer screens to live Emby IPC (replace mock) | ⬜ next |
+| libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
+| Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |
+
+Run `npm test` for the 27 Main-process unit tests (DeviceProfileBuilder, toAss, EmbyService).
