@@ -1,0 +1,74 @@
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-body);
+}
+.state-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(58, 130, 247, 0.2);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+.state-label {
+  font-size: var(--text-body);
+}
+.state-error-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(240, 68, 56, 0.12);
+  border: 1px solid rgba(240, 68, 56, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.state-retry {
+  padding: 8px 18px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-1);
+  color: var(--text-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.state-retry:hover {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+/* skeletons */
+.skeleton-row {
+  display: flex;
+  gap: 20px;
+}
+.poster-skeleton {
+  flex: none;
+}
+.poster-skeleton-art,
+.poster-skeleton-line {
+  border-radius: var(--r-card);
+  background: linear-gradient(
+    100deg,
+    var(--surface-1) 30%,
+    var(--surface-2) 50%,
+    var(--surface-1) 70%
+  );
+  background-size: 460px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.poster-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+.poster-skeleton-line.short {
+  width: 60%;
+  margin-top: 8px;
+}

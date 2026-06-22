@@ -36,6 +36,16 @@ export function PosterCard({
           background: `linear-gradient(150deg, ${item.poster[0]}, ${item.poster[1]})`,
         }}
       >
+        {item.posterUrl && (
+          <img
+            className="poster-img"
+            src={item.posterUrl}
+            alt={item.title}
+            width={width}
+            height={Math.round(width * 1.5)}
+            loading="lazy"
+          />
+        )}
         <span className={`dm-badge ${dm.cls}`}>
           {item.danmaku.status === 'matched' && <span className="dm-badge-dot" />}
           {dm.text}

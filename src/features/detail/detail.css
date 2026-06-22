@@ -5,6 +5,13 @@
   position: relative;
   height: 420px;
 }
+.detail-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .detail-hero-scrim {
   position: absolute;
   inset: 0;
@@ -38,12 +45,21 @@
   z-index: 2;
 }
 .detail-poster {
+  position: relative;
   width: 240px;
   height: 360px;
   flex: none;
   border-radius: var(--r-card);
   border: 1px solid var(--hairline-strong);
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.detail-poster-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .detail-main {
   flex: 1;

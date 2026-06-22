@@ -9,6 +9,8 @@ export interface Server {
   accentTo: string
   status: 'connected' | 'offline' | 'connecting'
   itemCount?: number
+  /** Base URL (Emby path) — present for real servers, used to build image URLs. */
+  baseUrl?: string
 }
 
 export type MediaKind = 'movie' | 'series' | 'anime'
@@ -23,8 +25,10 @@ export interface MediaItem {
   year: number
   rating?: number
   genres: string[]
-  /** Poster gradient `from,to` used by the mock catalog in place of artwork. */
+  /** Poster gradient `from,to` used as a fallback / by the mock catalog. */
   poster: [string, string]
+  /** Real artwork URL (Emby). When present, PosterCard renders the image. */
+  posterUrl?: string
   overview: string
   /** 0–1 watch progress for "continue watching". */
   progress?: number

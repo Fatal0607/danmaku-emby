@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/ui/Icon'
 import { TrafficLights } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
-import { servers } from '@/lib/mockData'
+import { useCurrentServerId, useServers } from '@/lib/queries'
 
 const NAV = [
   { to: '/', icon: 'home', label: '首页', end: true },
@@ -13,8 +13,10 @@ const NAV = [
 ] as const
 
 export function Sidebar() {
-  const { currentServerId, sidebarCollapsed, toggleSidebar } = useUI()
+  const { sidebarCollapsed, toggleSidebar } = useUI()
   const navigate = useNavigate()
+  const { data: servers = [] } = useServers()
+  const currentServerId = useCurrentServerId()
   const server = servers.find((s) => s.id === currentServerId) ?? servers[0]
 
   return (
@@ -27,22 +29,30 @@ export function Sidebar() {
       <button
         className="server-switch"
         onClick={() => navigate('/onboarding')}
-        title={server.name}
+        title={server?.name ?? '连接服务器'}
       >
         <span
           className="server-avatar"
-          style={{ background: `linear-gradient(135deg, ${server.accentFrom}, ${server.accentTo})` }}
+          style={{
+            background: server
+              ? `linear-gradient(135deg, ${server.accentFrom}, ${server.accentTo})`
+              : 'var(--surface-2)',
+          }}
         >
-          {server.initial}
+          {server?.initial ?? '+'}
         </span>
         {!sidebarCollapsed && (
           <>
             <span className="server-meta">
               <span className="server-name">
-                {server.name}
-                <span className="status-dot status-online" />
+                {server?.name ?? '连接服务器'}
+                {server && <span className="status-dot status-online" />}
               </span>
-              <span className="server-sub">已连接 · {server.itemCount?.toLocaleString()} 部</span>
+              <span className="server-sub">
+                {server
+                  ? `已连接${server.itemCount ? ` · ${server.itemCount.toLocaleString()} 部` : ''}`
+                  : '点击添加 Emby 服务器'}
+              </span>
             </span>
             <Icon name="chevron-down" size={14} color="var(--text-tertiary)" />
           </>
@@ -86,7 +96,7 @@ export function Sidebar() {
           <span className="user-avatar" />
           {!sidebarCollapsed && (
             <span className="user-meta">
-              <span className="user-name">cinephile</span>
+              <span className="user-name">{server?.name ? 'cinephile' : '未登录'}</span>
               <span className="user-role">管理员</span>
             </span>
           )}

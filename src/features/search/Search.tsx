@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { catalog } from '@/lib/mockData'
 import { PosterCard } from '@/components/media/PosterCard'
 import { Icon } from '@/components/ui/Icon'
+import { ErrorState, PosterSkeleton } from '@/components/ui/States'
+import { useDebounce } from '@/hooks/useDebounce'
+import { useCurrentServerId, useSearch } from '@/lib/queries'
 import '@/styles/page.css'
 import './search.css'
 
@@ -9,14 +11,9 @@ const SUGGESTIONS = ['星海彼端', '科幻', '4K HDR', '弹弹play', '2024 新
 
 export function Search() {
   const [query, setQuery] = useState('')
-  const results = query
-    ? catalog.filter(
-        (c) =>
-          c.title.includes(query) ||
-          c.genres.some((g) => g.includes(query)) ||
-          (c.quality?.includes(query) ?? false),
-      )
-    : catalog
+  const debounced = useDebounce(query, 250)
+  const serverId = useCurrentServerId()
+  const { data: results = [], isLoading, isError, error, refetch } = useSearch(serverId, debounced)
 
   return (
     <div className="page search-page">
@@ -46,10 +43,18 @@ export function Search() {
 
       <div className="row-head" style={{ marginTop: 12 }}>
         <span className="row-title">{query ? `“${query}” 的结果` : '推荐内容'}</span>
-        <span className="row-more">{results.length} 项</span>
+        <span className="row-more">{isLoading ? '搜索中…' : `${results.length} 项`}</span>
       </div>
 
-      {results.length ? (
+      {isError ? (
+        <ErrorState error={error} onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <div className="media-grid">
+          {Array.from({ length: 8 }, (_, i) => (
+            <PosterSkeleton key={i} width={200} />
+          ))}
+        </div>
+      ) : results.length ? (
         <div className="media-grid">
           {results.map((item) => (
             <PosterCard key={item.id} item={item} width={200} />

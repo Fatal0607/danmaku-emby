@@ -3,23 +3,34 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/ui/Icon'
 import { Button, TrafficLights } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
-import { servers } from '@/lib/mockData'
+import { useAddServer, useServers } from '@/lib/queries'
 import './onboarding.css'
 
 export function Onboarding() {
   const navigate = useNavigate()
   const { setServer } = useUI()
+  const { data: servers = [] } = useServers()
+  const addServer = useAddServer()
   const [address, setAddress] = useState('https://emby.local:8096')
   const [username, setUsername] = useState('cinephile')
   const [password, setPassword] = useState('cinephile')
-  const [connecting, setConnecting] = useState(false)
+  const connecting = addServer.isPending
 
-  const connect = (id?: string) => {
-    setConnecting(true)
-    setTimeout(() => {
-      if (id) setServer(id)
-      navigate('/')
-    }, 1400)
+  const selectExisting = (id: string) => {
+    setServer(id)
+    navigate('/')
+  }
+
+  const submit = () => {
+    addServer.mutate(
+      { address, username, password },
+      {
+        onSuccess: (server) => {
+          setServer(server.id)
+          navigate('/')
+        },
+      },
+    )
   }
 
   return (
@@ -38,7 +49,7 @@ export function Onboarding() {
             <button
               key={s.id}
               className={`onboard-server${s.status === 'offline' ? ' is-offline' : ''}`}
-              onClick={() => s.status !== 'offline' && connect(s.id)}
+              onClick={() => s.status !== 'offline' && selectExisting(s.id)}
             >
               <span
                 className="onboard-server-avatar"
@@ -78,7 +89,7 @@ export function Onboarding() {
         {connecting ? (
           <div className="onboard-card onboard-connecting">
             <div className="onboard-spinner" />
-            <div className="onboard-connecting-title">正在连接 客厅影院…</div>
+            <div className="onboard-connecting-title">正在连接…</div>
             <div className="onboard-connecting-sub">验证凭据 · 同步媒体库</div>
             <div className="onboard-connecting-bar">
               <div className="onboard-connecting-fill" />
@@ -97,7 +108,7 @@ export function Onboarding() {
               className="onboard-form"
               onSubmit={(e) => {
                 e.preventDefault()
-                connect('living-room')
+                submit()
               }}
             >
               <Field label="服务器地址">
@@ -127,6 +138,13 @@ export function Onboarding() {
               <Button full pulse style={{ marginTop: 6, padding: '12px 18px', fontSize: 14 }}>
                 连接
               </Button>
+              {addServer.isError && (
+                <div className="onboard-error">
+                  {addServer.error instanceof Error
+                    ? addServer.error.message
+                    : '连接失败,请检查地址与凭据'}
+                </div>
+              )}
               <div className="onboard-foot">
                 <span>使用 HTTPS · 凭据本地加密保存</span>
                 <span className="onboard-help">需要帮助?</span>

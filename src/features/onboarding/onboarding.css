@@ -215,6 +215,15 @@
 .onboard-input::placeholder {
   color: var(--text-faint);
 }
+.onboard-error {
+  margin-top: 2px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  background: rgba(240, 68, 56, 0.1);
+  border: 1px solid rgba(240, 68, 56, 0.35);
+  color: #f0746a;
+  font-size: 12px;
+}
 .onboard-foot {
   display: flex;
   justify-content: space-between;

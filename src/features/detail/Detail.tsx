@@ -1,14 +1,21 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { catalog, episodes } from '@/lib/mockData'
 import { Icon } from '@/components/ui/Icon'
 import { Button, Tag } from '@/components/ui/primitives'
+import { ErrorState, PageSpinner } from '@/components/ui/States'
+import { useCurrentServerId, useEpisodes, useMediaItem } from '@/lib/queries'
 import './detail.css'
 
 export function Detail() {
-  const { id } = useParams<{ id: string }>()
+  const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const item = catalog.find((c) => c.id === id) ?? catalog[0]
-  const isEpisodic = item.kind !== 'movie'
+  const serverId = useCurrentServerId()
+  const { data: item, isLoading, isError, error, refetch } = useMediaItem(serverId, id)
+  const isEpisodic = item != null && item.kind !== 'movie'
+  const episodesQuery = useEpisodes(serverId, isEpisodic ? id : undefined)
+  const episodeList = episodesQuery.data ?? []
+
+  if (isLoading) return <PageSpinner label="加载详情…" />
+  if (isError || !item) return <ErrorState error={error} onRetry={() => refetch()} />
 
   return (
     <div className="detail">
@@ -17,6 +24,7 @@ export function Detail() {
         className="detail-hero"
         style={{ background: `linear-gradient(135deg, ${item.poster[0]}, ${item.poster[1]})` }}
       >
+        {item.posterUrl && <img className="detail-hero-bg" src={item.posterUrl} alt="" />}
         <div className="detail-hero-scrim" />
         <button className="detail-back" onClick={() => navigate(-1)}>
           <Icon name="back" size={18} color="var(--text-soft)" />
@@ -27,19 +35,21 @@ export function Detail() {
         <div
           className="detail-poster"
           style={{ background: `linear-gradient(150deg, ${item.poster[0]}, ${item.poster[1]})` }}
-        />
+        >
+          {item.posterUrl && <img className="detail-poster-img" src={item.posterUrl} alt={item.title} />}
+        </div>
 
         <div className="detail-main">
           <h1 className="detail-title">{item.title}</h1>
           {item.originalTitle && <div className="detail-original">{item.originalTitle}</div>}
 
           <div className="detail-meta">
-            {item.rating && (
+            {item.rating != null && (
               <span className="detail-rating">
                 <Icon name="star" size={15} color="#f0b042" /> {item.rating}
               </span>
             )}
-            <span>{item.year}</span>
+            {item.year > 0 && <span>{item.year}</span>}
             {item.quality && <Tag tone="accent">{item.quality}</Tag>}
           </div>
 
@@ -81,7 +91,7 @@ export function Detail() {
             </button>
           </div>
 
-          <p className="detail-overview">{item.overview}</p>
+          {item.overview && <p className="detail-overview">{item.overview}</p>}
 
           <div className="detail-actions">
             <Button onClick={() => navigate(`/player/${item.id}`)}>
@@ -98,10 +108,12 @@ export function Detail() {
         <section className="detail-episodes">
           <div className="row-head" style={{ marginBottom: 18 }}>
             <span className="row-title">剧集 · 第 1 季</span>
-            <span className="row-more">共 {episodes.length} 集</span>
+            <span className="row-more">
+              {episodesQuery.isLoading ? '加载中…' : `共 ${episodeList.length} 集`}
+            </span>
           </div>
           <div className="episode-grid">
-            {episodes.map((ep) => (
+            {episodeList.map((ep) => (
               <button
                 key={ep.id}
                 className="episode-card"
@@ -129,7 +141,9 @@ export function Detail() {
                   <span className="episode-duration">{ep.duration}</span>
                 </div>
                 <div className="episode-info">
-                  <span className="episode-num">{ep.number}. {ep.title}</span>
+                  <span className="episode-num">
+                    {ep.number}. {ep.title}
+                  </span>
                   <span
                     className={`episode-dm episode-dm-${ep.danmaku}`}
                     title={ep.danmakuCount ? `${ep.danmakuCount} 条弹幕` : '未匹配'}

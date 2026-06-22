@@ -7,11 +7,23 @@
   margin-bottom: 52px;
   min-height: 380px;
 }
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .hero-scrim {
   position: absolute;
   inset: 0;
   background: radial-gradient(120% 140% at 85% 10%, transparent 30%, rgba(6, 8, 12, 0.55) 70%),
     linear-gradient(90deg, rgba(6, 8, 12, 0.92) 0%, rgba(6, 8, 12, 0.5) 45%, transparent 75%);
+}
+.hero-skeleton {
+  background: linear-gradient(100deg, var(--surface-1) 30%, var(--surface-2) 50%, var(--surface-1) 70%);
+  background-size: 900px 100%;
+  animation: shimmer 1.6s linear infinite;
 }
 .hero-body {
   position: relative;

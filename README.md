@@ -69,7 +69,10 @@ electron/main/
 ```
 
 The preload exposes a typed, whitelisted `window.api.emby` bridge; the renderer client
-(`src/lib/ipc.ts`) unwraps the `IpcResult` envelope and falls back to mock data in the browser.
+(`src/lib/ipc.ts`) unwraps the `IpcResult` envelope. The screens consume data through a
+`DataSource` abstraction (`src/lib/dataSource.ts`): the Emby implementation calls IPC, while a
+mock implementation backs the browser preview. TanStack Query hooks (`src/lib/queries.ts`)
+provide caching, loading, and error states.
 
 ## Status
 
@@ -78,7 +81,7 @@ The preload exposes a typed, whitelisted `window.api.emby` bridge; the renderer 
 | UI (9 screens, design system) | ✅ complete, runs on mock data |
 | Emby integration + SQLite + Keychain + secure IPC | ✅ implemented, unit-tested |
 | `toAss` danmaku→ASS converter, DeviceProfileBuilder | ✅ implemented, unit-tested |
-| Wire renderer screens to live Emby IPC (replace mock) | ⬜ next |
+| Renderer wired to live Emby IPC (TanStack Query, mock fallback in browser) | ✅ done |
 | libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
 | Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |
 
