@@ -3,8 +3,16 @@ import { Slider, Toggle, Segmented } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import './danmaku-settings.css'
 
-export function DanmakuSettings({ onClose }: { onClose: () => void }) {
+interface DanmakuSettingsProps {
+  onClose: () => void
+  providerLabel?: string
+  count?: number
+}
+
+export function DanmakuSettings({ onClose, providerLabel, count }: DanmakuSettingsProps) {
   const { danmaku, setDanmaku } = useUI()
+  const hint =
+    count != null ? `${providerLabel ?? '弹幕'} · ${count.toLocaleString()} 条` : '未匹配弹幕'
 
   return (
     <div className="dm-settings" role="dialog" aria-label="弹幕设置">
@@ -21,7 +29,7 @@ export function DanmakuSettings({ onClose }: { onClose: () => void }) {
       <div className="dm-settings-row dm-settings-toggle">
         <div>
           <div className="dm-settings-label">显示弹幕</div>
-          <div className="dm-settings-hint">弹弹play · 12,480 条</div>
+          <div className="dm-settings-hint">{hint}</div>
         </div>
         <Toggle
           checked={danmaku.enabled}

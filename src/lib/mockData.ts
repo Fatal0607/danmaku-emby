@@ -1,4 +1,5 @@
 import type { Server, MediaItem, Episode, DanmakuComment } from '@shared/types/domain'
+import type { CommentEntity } from '@shared/types/danmaku'
 
 export const servers: Server[] = [
   {
@@ -163,3 +164,15 @@ export const danmakuStream: DanmakuComment[] = Array.from({ length: 60 }, (_, i)
   lane: i % 7,
   mode: i % 11 === 0 ? 'top' : i % 13 === 0 ? 'bottom' : 'scroll',
 }))
+
+// Canonical `{p,m}` mock track for the browser preview. Spans a full 47-minute
+// runtime so the time-synced overlay shows comments wherever the playhead sits.
+const DM_COLOR_DECIMALS = DM_COLORS.map((hex) => parseInt(hex.slice(1), 16))
+const MOCK_TRACK_DURATION = 2828
+
+export const mockDanmakuComments: CommentEntity[] = Array.from({ length: 1200 }, (_, i) => {
+  const timeSec = ((i + Math.random() * 0.6) / 1200) * MOCK_TRACK_DURATION
+  const mode = i % 23 === 0 ? 5 : i % 29 === 0 ? 4 : 1
+  const color = DM_COLOR_DECIMALS[i % DM_COLOR_DECIMALS.length]
+  return { p: `${timeSec.toFixed(2)},${mode},${color},mock`, m: DM_TEXTS[i % DM_TEXTS.length] }
+})

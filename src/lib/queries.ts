@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ServerInput } from '@shared/types/emby'
 import type { MediaKind } from '@shared/types/domain'
+import type { DanmakuMatchInput, DanmakuProvider } from '@shared/types/danmaku'
 import { useUI } from './store'
 import { getDataSource } from './dataSource'
+import { getDanmakuSource, type ManualFetchArgs } from './danmakuSource'
 
 // TanStack Query hooks over the DataSource (docs 01 §1.5: server state lives in
 // TanStack Query, not the Zustand client store). Keys are namespaced by server.
 
 const ds = () => getDataSource()
+const dds = () => getDanmakuSource()
 
 export const qk = {
   servers: ['servers'] as const,
@@ -17,6 +20,10 @@ export const qk = {
   item: (s: string, id: string) => ['item', s, id] as const,
   episodes: (s: string, id: string) => ['episodes', s, id] as const,
   search: (s: string, term: string) => ['search', s, term] as const,
+  danmakuProviders: ['danmakuProviders'] as const,
+  danmakuTrack: (s: string, id: string) => ['danmakuTrack', s, id] as const,
+  danmakuSearch: (term: string) => ['danmakuSearch', term] as const,
+  danmakuEpisodes: (p: string, sid: string) => ['danmakuEpisodes', p, sid] as const,
 }
 
 export function useServers() {
@@ -92,5 +99,46 @@ export function useRemoveServer() {
   return useMutation({
     mutationFn: (serverId: string) => ds().removeServer(serverId),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.servers }),
+  })
+}
+
+// ---- Danmaku ----
+
+export function useDanmakuProviders() {
+  return useQuery({ queryKey: qk.danmakuProviders, queryFn: () => dds().listProviders() })
+}
+
+/** Auto-match the playing item to a danmaku track (cache-first in Main). */
+export function useDanmakuTrack(input?: DanmakuMatchInput) {
+  return useQuery({
+    queryKey: qk.danmakuTrack(input?.serverId ?? '', input?.embyItemId ?? ''),
+    queryFn: () => dds().autoMatch(input!),
+    enabled: !!input,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useDanmakuSearch(keyword: string) {
+  return useQuery({
+    queryKey: qk.danmakuSearch(keyword),
+    queryFn: () => dds().searchAll(keyword),
+    enabled: keyword.trim().length > 0,
+  })
+}
+
+export function useDanmakuEpisodes(provider?: DanmakuProvider, seasonId?: string) {
+  return useQuery({
+    queryKey: qk.danmakuEpisodes(provider ?? '', seasonId ?? ''),
+    queryFn: () => dds().episodes(provider!, seasonId!),
+    enabled: !!provider && !!seasonId,
+  })
+}
+
+export function useFetchManualDanmaku() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: ManualFetchArgs) => dds().fetchManual(args),
+    onSuccess: (_data, args) =>
+      qc.invalidateQueries({ queryKey: qk.danmakuTrack(args.serverId, args.embyItemId) }),
   })
 }

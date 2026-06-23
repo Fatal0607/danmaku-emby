@@ -1,27 +1,62 @@
 import { useState } from 'react'
+import type { DanmakuSeason } from '@shared/types/danmaku'
 import { Icon } from '@/components/ui/Icon'
 import { Button } from '@/components/ui/primitives'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { PROVIDER_LABELS } from '@/lib/danmaku'
+import {
+  useDanmakuEpisodes,
+  useDanmakuSearch,
+  useFetchManualDanmaku,
+} from '@/lib/queries'
 import './danmaku-match.css'
 
-interface MatchCandidate {
-  id: string
-  title: string
-  meta: string
-  provider: string
-  count: number
-  confidence: number
+interface DanmakuMatchProps {
+  onClose: () => void
+  serverId: string
+  embyItemId: string
+  defaultQuery: string
 }
 
-const CANDIDATES: MatchCandidate[] = [
-  { id: 'm1', title: '星海彼端', meta: '剧场版 · 2024', provider: '弹弹play', count: 12480, confidence: 0.98 },
-  { id: 'm2', title: '星海彼端 剧场版', meta: '1 集 · 剧场版', provider: '哔哩哔哩', count: 9320, confidence: 0.86 },
-  { id: 'm3', title: 'Beyond the Star Sea', meta: '12 集 · TV动画', provider: '弹弹play', count: 24180, confidence: 0.64 },
-  { id: 'm4', title: '星海的彼端', meta: '24 集 · TV动画', provider: '腾讯视频', count: 18040, confidence: 0.41 },
-]
+function seasonMeta(s: DanmakuSeason): string {
+  const parts = [s.type, s.year ? `${s.year}` : undefined, PROVIDER_LABELS[s.provider]].filter(
+    Boolean,
+  )
+  return parts.join(' · ')
+}
 
-export function DanmakuMatch({ onClose }: { onClose: () => void }) {
-  const [query, setQuery] = useState('星海彼端')
-  const [selected, setSelected] = useState('m1')
+export function DanmakuMatch({ onClose, serverId, embyItemId, defaultQuery }: DanmakuMatchProps) {
+  const [query, setQuery] = useState(defaultQuery)
+  const debounced = useDebouncedValue(query.trim(), 350)
+  const [season, setSeason] = useState<DanmakuSeason | null>(null)
+  const [episodeId, setEpisodeId] = useState<string | null>(null)
+
+  const { data: seasons = [], isFetching: searching } = useDanmakuSearch(debounced)
+  const { data: episodes = [], isFetching: loadingEpisodes } = useDanmakuEpisodes(
+    season?.provider,
+    season?.indexedId,
+  )
+  const fetchManual = useFetchManualDanmaku()
+
+  const selectSeason = (s: DanmakuSeason) => {
+    setSeason(s)
+    // A single-episode season has nothing to choose — preselect it.
+    setEpisodeId(s.episodeCount === 1 ? `${s.indexedId}-ep-1` : null)
+  }
+
+  const apply = () => {
+    if (!season || !episodeId) return
+    fetchManual.mutate(
+      {
+        provider: season.provider,
+        serverId,
+        embyItemId,
+        seasonId: season.indexedId,
+        indexedId: episodeId,
+      },
+      { onSuccess: onClose },
+    )
+  }
 
   return (
     <div className="match-backdrop" onClick={onClose}>
@@ -29,7 +64,7 @@ export function DanmakuMatch({ onClose }: { onClose: () => void }) {
         <div className="match-head">
           <div>
             <div className="match-title">手动匹配弹幕</div>
-            <div className="match-sub">为「星海彼端」选择正确的弹幕来源</div>
+            <div className="match-sub">为「{defaultQuery}」选择正确的弹幕来源</div>
           </div>
           <button className="match-close" onClick={onClose} aria-label="关闭">
             <Icon name="plus" size={18} color="var(--text-muted)" style={{ transform: 'rotate(45deg)' }} />
@@ -40,37 +75,60 @@ export function DanmakuMatch({ onClose }: { onClose: () => void }) {
           <Icon name="search" size={18} color="var(--text-muted)" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setSeason(null)
+              setEpisodeId(null)
+            }}
             placeholder="搜索弹幕库标题…"
           />
-          <span className="match-provider-pill">全部来源</span>
+          <span className="match-provider-pill">{searching ? '搜索中…' : '全部来源'}</span>
         </div>
 
         <div className="match-list">
-          {CANDIDATES.map((c) => (
-            <button
-              key={c.id}
-              className={`match-item${selected === c.id ? ' is-selected' : ''}`}
-              onClick={() => setSelected(c.id)}
-            >
-              <span className="match-radio">
-                {selected === c.id && <span className="match-radio-dot" />}
-              </span>
-              <span className="match-item-main">
-                <span className="match-item-title">{c.title}</span>
-                <span className="match-item-meta">
-                  {c.meta} · {c.provider}
-                </span>
-              </span>
-              <span className="match-item-count">{c.count.toLocaleString()} 条</span>
-              <span
-                className="match-confidence"
-                data-level={c.confidence > 0.9 ? 'high' : c.confidence > 0.6 ? 'mid' : 'low'}
-              >
-                {Math.round(c.confidence * 100)}%
-              </span>
-            </button>
-          ))}
+          {seasons.length === 0 && !searching && (
+            <div className="match-empty">未找到结果,换个关键词试试</div>
+          )}
+          {seasons.map((s) => {
+            const selected = season?.indexedId === s.indexedId
+            return (
+              <div key={`${s.provider}-${s.indexedId}`}>
+                <button
+                  className={`match-item${selected ? ' is-selected' : ''}`}
+                  onClick={() => selectSeason(s)}
+                >
+                  <span className="match-radio">
+                    {selected && <span className="match-radio-dot" />}
+                  </span>
+                  <span className="match-item-main">
+                    <span className="match-item-title">{s.title}</span>
+                    <span className="match-item-meta">{seasonMeta(s)}</span>
+                  </span>
+                  {s.episodeCount != null && (
+                    <span className="match-item-count">{s.episodeCount} 集</span>
+                  )}
+                </button>
+
+                {selected && s.episodeCount !== 1 && (
+                  <div className="match-episodes">
+                    {loadingEpisodes && <div className="match-empty">加载剧集…</div>}
+                    {episodes.map((ep) => (
+                      <button
+                        key={ep.indexedId}
+                        className={`match-ep${episodeId === ep.indexedId ? ' is-selected' : ''}`}
+                        onClick={() => setEpisodeId(ep.indexedId)}
+                      >
+                        <span className="match-radio">
+                          {episodeId === ep.indexedId && <span className="match-radio-dot" />}
+                        </span>
+                        <span className="match-ep-title">{ep.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <div className="match-foot">
@@ -79,7 +137,9 @@ export function DanmakuMatch({ onClose }: { onClose: () => void }) {
             <Button variant="secondary" onClick={onClose}>
               取消
             </Button>
-            <Button onClick={onClose}>应用匹配</Button>
+            <Button onClick={apply} disabled={!episodeId || fetchManual.isPending}>
+              {fetchManual.isPending ? '应用中…' : '应用匹配'}
+            </Button>
           </div>
         </div>
       </div>

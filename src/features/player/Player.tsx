@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import type { DanmakuMatchInput } from '@shared/types/danmaku'
 import { Icon } from '@/components/ui/Icon'
 import { TrafficLights } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { catalog } from '@/lib/mockData'
+import { useCurrentServerId, useDanmakuTrack } from '@/lib/queries'
+import { PROVIDER_LABELS, trackToComments } from '@/lib/danmaku'
 import { DanmakuLayer } from './DanmakuLayer'
 import { DanmakuSettings } from './DanmakuSettings'
 import { DanmakuMatch } from './DanmakuMatch'
@@ -22,6 +25,27 @@ export function Player() {
   const navigate = useNavigate()
   const { danmaku, setDanmaku } = useUI()
   const item = catalog.find((c) => c.id === id) ?? catalog[0]
+  const serverId = useCurrentServerId()
+
+  // Auto-match the playing item to a danmaku track. Until libmpv lands we lack a
+  // real PlaybackSource, so the match input is built from the item metadata we
+  // have; the manual match flow covers cases auto-match can't resolve.
+  const matchInput = useMemo<DanmakuMatchInput | undefined>(
+    () =>
+      serverId
+        ? {
+            embyItemId: item.id,
+            serverId,
+            fileName: item.title,
+            seriesTitle: item.title,
+            videoDurationSec: TOTAL,
+          }
+        : undefined,
+    [serverId, item.id, item.title],
+  )
+  const { data: track } = useDanmakuTrack(matchInput)
+  const comments = useMemo(() => trackToComments(track), [track])
+  const providerLabel = track ? PROVIDER_LABELS[track.provider] : undefined
 
   const [playing, setPlaying] = useState(true)
   const [time, setTime] = useState(Math.round(TOTAL * (item.progress ?? 0.26)))
@@ -76,7 +100,7 @@ export function Player() {
       </div>
 
       {/* Danmaku overlay */}
-      <DanmakuLayer settings={danmaku} playing={playing} />
+      <DanmakuLayer settings={danmaku} playing={playing} time={time} comments={comments} />
 
       {/* Top bar */}
       <div className="player-topbar">
@@ -87,7 +111,10 @@ export function Player() {
         <div className="player-titleblock">
           <div className="player-title">{item.title}</div>
           <div className="player-subtitle">
-            {item.episodeLabel ?? `${item.year}`} · {item.danmaku.provider ?? '无弹幕'}
+            {item.episodeLabel ?? `${item.year}`} ·{' '}
+            {track
+              ? `${providerLabel} · ${track.commentCount.toLocaleString()} 条`
+              : '无弹幕'}
           </div>
         </div>
         <div className="player-top-actions">
@@ -161,8 +188,21 @@ export function Player() {
         </div>
       </div>
 
-      {showSettings && <DanmakuSettings onClose={() => setShowSettings(false)} />}
-      {showMatch && <DanmakuMatch onClose={() => setShowMatch(false)} />}
+      {showSettings && (
+        <DanmakuSettings
+          onClose={() => setShowSettings(false)}
+          providerLabel={providerLabel}
+          count={track?.commentCount}
+        />
+      )}
+      {showMatch && (
+        <DanmakuMatch
+          onClose={() => setShowMatch(false)}
+          serverId={serverId ?? ''}
+          embyItemId={item.id}
+          defaultQuery={item.title}
+        />
+      )}
     </div>
   )
 }
