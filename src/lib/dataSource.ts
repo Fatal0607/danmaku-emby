@@ -1,6 +1,7 @@
-import type { Server, MediaItem, MediaKind, Episode } from '@shared/types/domain'
-import type { ServerInput, EmbyItemType } from '@shared/types/emby'
+import type { Server, MediaItem, MediaKind, Episode, MediaSection } from '@shared/types/domain'
+import type { ServerInput, EmbyItemType, EmbyView } from '@shared/types/emby'
 import { getApi, isElectron, unwrap } from './ipc'
+import { buildHomeSectionQuery, buildViewSectionQuery, toMediaSection } from './homeSections'
 import {
   embyEpisodeToView,
   embyItemToMedia,
@@ -18,6 +19,8 @@ export interface DataSource {
   removeServer(serverId: string): Promise<void>
   continueWatching(serverId: string): Promise<MediaItem[]>
   recentlyAdded(serverId: string): Promise<MediaItem[]>
+  homeSections(serverId: string): Promise<MediaSection[]>
+  viewSection(serverId: string, viewId: string): Promise<MediaSection>
   library(serverId: string, kind: MediaKind): Promise<MediaItem[]>
   item(serverId: string, itemId: string): Promise<MediaItem>
   episodes(serverId: string, seriesId: string): Promise<Episode[]>
@@ -28,6 +31,22 @@ const KIND_TO_TYPES: Record<MediaKind, EmbyItemType[]> = {
   movie: ['Movie'],
   series: ['Series'],
   anime: ['Series'],
+}
+
+const MOCK_VIEWS: EmbyView[] = [
+  { id: 'mock-movies', name: '电影', collectionType: 'movies' },
+  { id: 'mock-series', name: '剧集', collectionType: 'tvshows' },
+  { id: 'mock-anime', name: '动漫', collectionType: 'tvshows' },
+]
+
+function mockItemsForView(viewId: string): MediaItem[] {
+  return catalog.filter((item) =>
+    viewId === 'mock-movies'
+      ? item.kind === 'movie'
+      : viewId === 'mock-anime'
+        ? item.kind === 'anime'
+        : item.kind === 'series',
+  )
 }
 
 class EmbyDataSource implements DataSource {
@@ -87,6 +106,42 @@ class EmbyDataSource implements DataSource {
     return page.items.map((i) => embyItemToMedia(i, base))
   }
 
+  async homeSections(serverId: string): Promise<MediaSection[]> {
+    const base = await this.baseUrl(serverId)
+    const views = await unwrap(getApi().emby.views(serverId))
+    const sections = await Promise.all(
+      views.map(async (view) => {
+        const page = await unwrap(getApi().emby.items(buildHomeSectionQuery(serverId, view)))
+        const items = page.items.map((i) => embyItemToMedia(i, base))
+        return toMediaSection(view, items)
+      }),
+    )
+    return sections.filter((section) => section.items.length > 0)
+  }
+
+  async viewSection(serverId: string, viewId: string): Promise<MediaSection> {
+    const base = await this.baseUrl(serverId)
+    const views = await unwrap(getApi().emby.views(serverId))
+    const view = views.find((v) => v.id === viewId)
+    if (!view) throw new Error('未找到这个 Emby 资源库')
+
+    const items: MediaItem[] = []
+    let startIndex = 0
+    let total = Number.POSITIVE_INFINITY
+
+    while (items.length < total) {
+      const page = await unwrap(
+        getApi().emby.items(buildViewSectionQuery(serverId, view, startIndex)),
+      )
+      total = page.total
+      if (page.items.length === 0) break
+      items.push(...page.items.map((i) => embyItemToMedia(i, base)))
+      startIndex += page.items.length
+    }
+
+    return toMediaSection(view, items)
+  }
+
   async library(serverId: string, kind: MediaKind): Promise<MediaItem[]> {
     const base = await this.baseUrl(serverId)
     const page = await unwrap(
@@ -135,6 +190,14 @@ class MockDataSource implements DataSource {
   }
   async recentlyAdded(): Promise<MediaItem[]> {
     return catalog
+  }
+  async homeSections(): Promise<MediaSection[]> {
+    return MOCK_VIEWS.map((view) => toMediaSection(view, mockItemsForView(view.id)))
+  }
+  async viewSection(_serverId: string, viewId: string): Promise<MediaSection> {
+    const view = MOCK_VIEWS.find((v) => v.id === viewId)
+    if (!view) throw new Error('未找到这个 Emby 资源库')
+    return toMediaSection(view, mockItemsForView(view.id))
   }
   async library(_serverId: string, kind: MediaKind): Promise<MediaItem[]> {
     const base = catalog.filter((c) => c.kind === kind)

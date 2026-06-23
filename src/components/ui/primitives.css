@@ -7,6 +7,10 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  border: none;
+  padding: 0;
+  display: block;
+  -webkit-app-region: no-drag;
 }
 .tl-red {
   background: var(--tl-red);

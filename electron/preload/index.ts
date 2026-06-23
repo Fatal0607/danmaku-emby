@@ -27,6 +27,7 @@ import type {
   PlayerLoadRequest,
   PlayerLoadResult,
   PlayerStatePush,
+  PlayerVideoFramePush,
 } from '@shared/types/player'
 
 // Whitelisted, typed bridge (docs 06 §6.1). The renderer never sees ipcRenderer
@@ -102,10 +103,29 @@ const playerApi = {
     ipcRenderer.on(CH.PLAYER_STATE, handler)
     return () => ipcRenderer.removeListener(CH.PLAYER_STATE, handler)
   },
+  /** Subscribe to pushed L3 render frames; returns an unsubscribe function. */
+  onFrame: (cb: (frame: PlayerVideoFramePush) => void): (() => void) => {
+    const handler = (_e: unknown, frame: PlayerVideoFramePush) => cb(frame)
+    ipcRenderer.on(CH.PLAYER_FRAME, handler)
+    return () => ipcRenderer.removeListener(CH.PLAYER_FRAME, handler)
+  },
+}
+
+const windowApi = {
+  close: (): void => {
+    ipcRenderer.send(CH.WINDOW_CLOSE)
+  },
+  minimize: (): void => {
+    ipcRenderer.send(CH.WINDOW_MINIMIZE)
+  },
+  toggleMaximize: (): void => {
+    ipcRenderer.send(CH.WINDOW_TOGGLE_MAXIMIZE)
+  },
 }
 
 const api = {
   platform: process.platform,
+  window: windowApi,
   emby: embyApi,
   danmaku: danmakuApi,
   player: playerApi,

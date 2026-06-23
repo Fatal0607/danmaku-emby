@@ -57,6 +57,7 @@ export class PlayerController {
   private lastReportAt = 0
   private readonly progressIntervalMs: number
   private readonly now: () => number
+  private disposed = false
 
   constructor(
     private readonly engine: PlayerEngine,
@@ -76,6 +77,7 @@ export class PlayerController {
 
   /** Resolve → load → overlay danmaku → play → report 'start'. */
   async load(req: PlayerLoadRequest): Promise<PlayerLoadResult> {
+    this.disposed = false
     await this.reportStop() // close out any prior session
 
     const src = await this.emby.resolvePlayback(req.serverId, req.itemId, req.startTicks)
@@ -93,7 +95,7 @@ export class PlayerController {
       ended: false,
     }
 
-    const danmakuCount = req.withDanmaku === false ? 0 : await this.overlayDanmaku(req, src)
+    const danmakuCount = req.withDanmaku === false ? 0 : await this.tryOverlayDanmaku(req, src)
 
     this.engine.play()
     this.lastReportAt = this.now()
@@ -106,13 +108,16 @@ export class PlayerController {
     }
   }
 
-  command(cmd: PlayerCommand): void {
+  async command(cmd: PlayerCommand): Promise<void> {
     switch (cmd.type) {
       case 'play':
         this.engine.play()
         break
       case 'pause':
         this.engine.pause()
+        break
+      case 'stop':
+        await this.stopPlayback()
         break
       case 'seek':
         this.engine.seek(cmd.seconds)
@@ -123,11 +128,15 @@ export class PlayerController {
       case 'setSubtitle':
         this.engine.setSubtitle(cmd.index)
         break
+      case 'setFrameSize':
+        this.engine.setFrameSize?.(cmd.width, cmd.height)
+        break
     }
   }
 
   /** Stop reporting + tear down the engine (app quit / view change). */
   async dispose(): Promise<void> {
+    this.disposed = true
     await this.reportStop()
     this.engine.dispose()
   }
@@ -148,7 +157,25 @@ export class PlayerController {
     return track.commentCount
   }
 
+  private async tryOverlayDanmaku(req: PlayerLoadRequest, src: PlaybackSource): Promise<number> {
+    try {
+      return await this.overlayDanmaku(req, src)
+    } catch {
+      // Danmaku is additive. Provider/network/ASS errors must not abort video.
+      return 0
+    }
+  }
+
+  private async stopPlayback(): Promise<void> {
+    this.engine.stop?.()
+    if (!this.engine.stop) this.engine.pause()
+    this.lastState = { ...this.lastState, paused: true, ended: false }
+    this.sender.send(toPush(this.lastState))
+    await this.reportStop()
+  }
+
   private onTimeUpdate(s: PlayerStateEvent): void {
+    if (this.disposed) return
     this.lastState = { ...this.lastState, timeSec: s.timeSec, durationSec: s.durationSec || this.lastState.durationSec }
     this.sender.send(toPush(this.lastState))
     if (this.current && this.now() - this.lastReportAt >= this.progressIntervalMs) {
@@ -158,12 +185,14 @@ export class PlayerController {
   }
 
   private onPauseToggle(s: PlayerStateEvent): void {
+    if (this.disposed) return
     this.lastState = { ...this.lastState, paused: s.paused }
     this.sender.send(toPush(this.lastState))
     void this.report('progress')
   }
 
   private onEnded(s: PlayerStateEvent): void {
+    if (this.disposed) return
     this.lastState = { ...this.lastState, ended: true, timeSec: s.timeSec || this.lastState.timeSec }
     this.sender.send(toPush(this.lastState))
     void this.reportStop()

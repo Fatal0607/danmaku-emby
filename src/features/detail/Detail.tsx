@@ -1,18 +1,41 @@
+import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import type { DanmakuMatchInput } from '@shared/types/danmaku'
 import { Icon } from '@/components/ui/Icon'
 import { Button, Tag } from '@/components/ui/primitives'
 import { ErrorState, PageSpinner } from '@/components/ui/States'
-import { useCurrentServerId, useEpisodes, useMediaItem } from '@/lib/queries'
+import { PROVIDER_LABELS } from '@/lib/danmaku'
+import { useCurrentServerId, useDanmakuTrack, useEpisodes, useMediaItem } from '@/lib/queries'
+import { DanmakuMatch } from '@/features/player/DanmakuMatch'
 import './detail.css'
 
 export function Detail() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const serverId = useCurrentServerId()
+  const [showMatch, setShowMatch] = useState(false)
   const { data: item, isLoading, isError, error, refetch } = useMediaItem(serverId, id)
   const isEpisodic = item != null && item.kind !== 'movie'
-  const episodesQuery = useEpisodes(serverId, isEpisodic ? id : undefined)
+  const episodeSeriesId = isEpisodic ? item.seriesId ?? item.id : undefined
+  const episodesQuery = useEpisodes(serverId, episodeSeriesId)
   const episodeList = episodesQuery.data ?? []
+
+  const matchInput = useMemo<DanmakuMatchInput | undefined>(() => {
+    if (!serverId || !item) return undefined
+    return {
+      embyItemId: item.id,
+      serverId,
+      fileName: item.originalTitle ?? item.title,
+      seriesTitle: item.title,
+      season: item.seasonNumber,
+      episode: item.episodeNumber,
+      videoDurationSec: item.durationSec,
+    }
+  }, [item, serverId])
+  const danmakuQuery = useDanmakuTrack(matchInput)
+  const track = danmakuQuery.data
+  const danmakuStatus = track ? 'matched' : danmakuQuery.isFetching ? 'matching' : item?.danmaku.status
+  const providerLabel = track ? PROVIDER_LABELS[track.provider] : item?.danmaku.provider
 
   if (isLoading) return <PageSpinner label="加载详情…" />
   if (isError || !item) return <ErrorState error={error} onRetry={() => refetch()} />
@@ -60,34 +83,38 @@ export function Detail() {
           </div>
 
           {/* Danmaku match status banner */}
-          <div className={`dm-status dm-status-${item.danmaku.status}`}>
+          <div className={`dm-status dm-status-${danmakuStatus}`}>
             <div className="dm-status-icon">
               <Icon name="danmaku" size={18} color="currentColor" />
             </div>
             <div className="dm-status-text">
-              {item.danmaku.status === 'matched' && (
+              {danmakuStatus === 'matched' && (
                 <>
                   <strong>弹幕已匹配</strong>
                   <span>
-                    {item.danmaku.provider} · {item.danmaku.count?.toLocaleString()} 条
+                    {providerLabel} · {(track?.commentCount ?? item.danmaku.count ?? 0).toLocaleString()} 条
                   </span>
                 </>
               )}
-              {item.danmaku.status === 'matching' && (
+              {danmakuStatus === 'matching' && (
                 <>
                   <strong>正在匹配弹幕…</strong>
                   <span>自动检索弹弹play / B站 / 腾讯</span>
                 </>
               )}
-              {item.danmaku.status === 'unmatched' && (
+              {danmakuStatus === 'unmatched' && (
                 <>
                   <strong>尚未匹配弹幕</strong>
                   <span>手动选择剧集以叠加弹幕</span>
                 </>
               )}
             </div>
-            <button className="dm-status-action">
-              {item.danmaku.status === 'unmatched' ? '立即匹配' : '更换匹配'}
+            <button
+              className="dm-status-action"
+              onClick={() => setShowMatch(true)}
+              disabled={!serverId}
+            >
+              {danmakuStatus === 'unmatched' ? '立即匹配' : '更换匹配'}
             </button>
           </div>
 
@@ -107,7 +134,7 @@ export function Detail() {
       {isEpisodic && (
         <section className="detail-episodes">
           <div className="row-head" style={{ marginBottom: 18 }}>
-            <span className="row-title">剧集 · 第 1 季</span>
+            <span className="row-title">剧集 · 第 {item.seasonNumber ?? 1} 季</span>
             <span className="row-more">
               {episodesQuery.isLoading ? '加载中…' : `共 ${episodeList.length} 集`}
             </span>
@@ -117,7 +144,7 @@ export function Detail() {
               <button
                 key={ep.id}
                 className="episode-card"
-                onClick={() => navigate(`/player/${item.id}`)}
+                onClick={() => navigate(`/player/${ep.id}`)}
               >
                 <div
                   className="episode-thumb"
@@ -159,6 +186,15 @@ export function Detail() {
             ))}
           </div>
         </section>
+      )}
+
+      {showMatch && (
+        <DanmakuMatch
+          onClose={() => setShowMatch(false)}
+          serverId={serverId ?? ''}
+          embyItemId={item.id}
+          defaultQuery={item.title}
+        />
       )}
     </div>
   )

@@ -330,6 +330,7 @@ const TYPE_MAP: Record<string, EmbyItemType> = {
   Series: 'Series',
   Season: 'Season',
   Episode: 'Episode',
+  Video: 'Video',
 }
 
 export function mapItem(raw: RawItem, serverId: string): EmbyItem {

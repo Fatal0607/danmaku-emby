@@ -45,7 +45,7 @@ function ticksToLabel(ticks?: number): string | undefined {
 }
 
 function kindOf(item: EmbyItem): MediaKind {
-  if (item.type === 'Movie') return 'movie'
+  if (item.type === 'Movie' || item.type === 'Video') return 'movie'
   // Emby has no first-class "anime"; infer from genres, else treat as series.
   const genres = (item.genres ?? []).join(',')
   if (/动画|动漫|anime|animation/i.test(genres)) return 'anime'
@@ -68,16 +68,22 @@ export function embyItemToMedia(item: EmbyItem, baseUrl?: string): MediaItem {
   const primaryTag = item.imageTags?.primary
   const posterUrl =
     baseUrl && primaryTag ? embyImageUrl(baseUrl, item.id, primaryTag) : undefined
+  const durationSec = item.runTimeTicks ? item.runTimeTicks / TICKS_PER_SECOND : undefined
+  const isEpisode = item.type === 'Episode'
+  const title = isEpisode ? item.seriesName || item.name : item.name
   const episodeLabel =
-    item.type === 'Episode' && item.indexNumber != null
-      ? `第 ${item.indexNumber} 集`
+    isEpisode && item.indexNumber != null
+      ? item.name && item.name !== title
+        ? `第 ${item.indexNumber} 集 · ${item.name}`
+        : `第 ${item.indexNumber} 集`
       : item.type !== 'Movie' && item.playedPercentage
         ? '继续观看'
         : undefined
 
   return {
     id: item.id,
-    title: item.name,
+    title,
+    originalTitle: isEpisode ? item.name : undefined,
     kind: kindOf(item),
     year: item.productionYear ?? 0,
     rating: item.communityRating,
@@ -86,6 +92,11 @@ export function embyItemToMedia(item: EmbyItem, baseUrl?: string): MediaItem {
     posterUrl,
     overview: item.overview ?? '',
     progress: item.playedPercentage,
+    durationSec,
+    playbackPositionTicks: item.playbackPositionTicks,
+    seriesId: item.seriesId,
+    seasonNumber: item.parentIndexNumber,
+    episodeNumber: item.indexNumber,
     episodeLabel,
     durationLabel: ticksToLabel(item.runTimeTicks),
     // Danmaku match status is resolved separately (danmaku_map); default unknown.

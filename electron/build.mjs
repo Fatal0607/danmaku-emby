@@ -26,7 +26,7 @@ const main = {
   entryPoints: [resolve(root, 'electron/main/index.ts')],
   outfile: resolve(root, 'dist-electron/main/index.js'),
   format: 'esm',
-  external: ['electron', 'better-sqlite3'],
+  external: ['electron', 'better-sqlite3', '@danmaku-emby/mpv-render'],
 }
 
 // Preload is emitted as CommonJS (.cjs) for the widest Electron compatibility

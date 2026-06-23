@@ -15,7 +15,7 @@ export interface MpvIpcOptions {
   binaryPath?: string
   socketPath?: string
   /** Extra mpv CLI flags (e.g. --hwdec, --vo for headless tests). */
-  extraArgs?: string[]
+  extraArgs?: string[] | (() => string[])
   connectTimeoutMs?: number
 }
 
@@ -43,7 +43,7 @@ export class MpvIpcClient extends EventEmitter {
   private buffer = ''
   private readonly binaryPath: string
   private readonly socketPath: string
-  private readonly extraArgs: string[]
+  private readonly extraArgs: string[] | (() => string[])
   private readonly connectTimeoutMs: number
 
   constructor(opts: MpvIpcOptions = {}) {
@@ -57,6 +57,7 @@ export class MpvIpcClient extends EventEmitter {
 
   /** Launch mpv (idle) and connect to its IPC socket. */
   async start(): Promise<void> {
+    const extraArgs = typeof this.extraArgs === 'function' ? this.extraArgs() : this.extraArgs
     this.proc = spawn(
       this.binaryPath,
       [
@@ -64,7 +65,7 @@ export class MpvIpcClient extends EventEmitter {
         '--idle=yes',
         '--no-terminal',
         '--no-config',
-        ...this.extraArgs,
+        ...extraArgs,
       ],
       { stdio: 'ignore' },
     )

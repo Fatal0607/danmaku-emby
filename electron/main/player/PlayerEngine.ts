@@ -19,6 +19,13 @@ export interface PlayerStateEvent {
   error?: string
 }
 
+export interface PlayerVideoFrameEvent {
+  width: number
+  height: number
+  format: 'rgba'
+  data: Uint8Array
+}
+
 export type PlayerEventName = 'timeupdate' | 'ended' | 'pause' | 'play' | 'error'
 
 export interface PlayerEngine {
@@ -26,13 +33,23 @@ export interface PlayerEngine {
   load(src: PlaybackSource): Promise<void>
   play(): void
   pause(): void
+  stop?(): void
   seek(seconds: number): void
   setAudioTrack(index: number): void
   setSubtitle(index: number | null): void
+  setFrameSize?(width: number, height: number): void
   /** mpv-only: load danmaku as an ASS overlay (html5 implements as no-op). */
   loadAssOverlay?(assText: string): void
   on(event: PlayerEventName, cb: (payload: PlayerStateEvent) => void): void
   dispose(): void
+}
+
+export interface PlayerFrameEngine extends PlayerEngine {
+  onFrame(cb: (frame: PlayerVideoFrameEvent) => void): void
+}
+
+export function hasVideoFrames(engine: PlayerEngine): engine is PlayerFrameEngine {
+  return typeof (engine as Partial<PlayerFrameEngine>).onFrame === 'function'
 }
 
 /** MpvEngine capability declaration (docs 03 §3.6) — feeds DeviceProfileBuilder. */

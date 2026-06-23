@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { MediaItem } from '@shared/types/domain'
 import { Icon } from '@/components/ui/Icon'
+import { formatMediaSubtitle } from '@/lib/mediaText'
 import './poster-card.css'
 
 const DM_LABEL: Record<MediaItem['danmaku']['status'], { cls: string; text: string }> = {
@@ -66,9 +67,7 @@ export function PosterCard({
       </div>
       <div className="poster-info">
         <div className="poster-title">{item.title}</div>
-        <div className="poster-sub">
-          {item.episodeLabel ? item.episodeLabel : `${item.year} · ${item.genres[0]}`}
-        </div>
+        <div className="poster-sub">{formatMediaSubtitle(item)}</div>
       </div>
     </article>
   )

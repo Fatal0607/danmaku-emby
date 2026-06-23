@@ -21,9 +21,11 @@ export interface PlayerLoadResult {
 export type PlayerCommand =
   | { type: 'play' }
   | { type: 'pause' }
+  | { type: 'stop' }
   | { type: 'seek'; seconds: number }
   | { type: 'setAudioTrack'; index: number }
   | { type: 'setSubtitle'; index: number | null }
+  | { type: 'setFrameSize'; width: number; height: number }
 
 export interface PlayerStatePush {
   timeSec: number
@@ -31,4 +33,11 @@ export interface PlayerStatePush {
   paused: boolean
   ended: boolean
   error?: string
+}
+
+export interface PlayerVideoFramePush {
+  width: number
+  height: number
+  format: 'rgba'
+  data: Uint8Array
 }

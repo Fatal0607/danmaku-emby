@@ -4,6 +4,7 @@ import { Onboarding } from './features/onboarding/Onboarding'
 import { Home } from './features/home/Home'
 import { Library } from './features/library/Library'
 import { Detail } from './features/detail/Detail'
+import { ViewAll } from './features/view/ViewAll'
 import { Search } from './features/search/Search'
 import { Player } from './features/player/Player'
 import { Settings } from './features/settings/Settings'
@@ -19,6 +20,7 @@ export function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/library/:kind" element={<Library />} />
+        <Route path="/view/:viewId" element={<ViewAll />} />
         <Route path="/detail/:id" element={<Detail />} />
         <Route path="/search" element={<Search />} />
         <Route path="/settings" element={<Settings />} />

@@ -28,6 +28,10 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError 
 
 /** Channel name registry. All Main↔Renderer invoke channels live here. */
 export const CH = {
+  // Window controls
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_TOGGLE_MAXIMIZE: 'window:toggleMaximize',
   // Emby
   EMBY_ADD_SERVER: 'emby:addServer',
   EMBY_LIST_SERVERS: 'emby:listServers',
@@ -48,6 +52,7 @@ export const CH = {
   PLAYER_LOAD: 'player:load',
   PLAYER_CMD: 'player:cmd',
   PLAYER_STATE: 'player:state',
+  PLAYER_FRAME: 'player:frame',
   // Danmaku
   DM_PROVIDERS: 'danmaku:listProviders',
   DM_LIST_CONFIGS: 'danmaku:listConfigs',

@@ -1,10 +1,17 @@
+import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { MediaItem } from '@shared/types/domain'
+import type { MediaItem, MediaSection } from '@shared/types/domain'
 import { PosterCard } from '@/components/media/PosterCard'
 import { Icon } from '@/components/ui/Icon'
 import { Tag, Button } from '@/components/ui/primitives'
 import { SkeletonRow } from '@/components/ui/States'
-import { useContinueWatching, useCurrentServerId, useRecentlyAdded } from '@/lib/queries'
+import {
+  useContinueWatching,
+  useCurrentServerId,
+  useHomeSections,
+  useRecentlyAdded,
+} from '@/lib/queries'
+import { scrollRailByPage } from '@/lib/scrollRail'
 import '@/styles/page.css'
 import './home.css'
 
@@ -13,9 +20,11 @@ export function Home() {
   const serverId = useCurrentServerId()
   const cw = useContinueWatching(serverId)
   const recent = useRecentlyAdded(serverId)
+  const sectionsQuery = useHomeSections(serverId)
 
   const continueWatching = cw.data ?? []
   const recentItems = recent.data ?? []
+  const homeSections = sectionsQuery.data ?? []
   const hero = continueWatching[0] ?? recentItems[0]
 
   return (
@@ -40,34 +49,97 @@ export function Home() {
       <section className="content-row">
         <div className="row-head">
           <span className="row-title">继续观看</span>
-          <span className="row-more">查看全部</span>
         </div>
         {cw.isLoading ? (
           <SkeletonRow width={210} />
         ) : (
-          <div className="row-rail">
-            {continueWatching.map((item) => (
-              <PosterCard key={item.id} item={item} width={210} showProgress />
-            ))}
-          </div>
+          <MediaRail items={continueWatching} cardWidth={210} showProgress label="继续观看" />
         )}
       </section>
 
       <section className="content-row">
         <div className="row-head">
           <span className="row-title">最近添加</span>
-          <span className="row-more">查看全部</span>
         </div>
         {recent.isLoading ? (
           <SkeletonRow width={190} />
         ) : (
-          <div className="row-rail">
-            {recentItems.map((item) => (
-              <PosterCard key={item.id} item={item} width={190} />
-            ))}
-          </div>
+          <MediaRail items={recentItems} cardWidth={190} label="最近添加" />
         )}
       </section>
+
+      {sectionsQuery.isLoading
+        ? Array.from({ length: 3 }, (_, i) => (
+            <section className="content-row" key={`home-section-skeleton-${i}`}>
+              <div className="row-head">
+                <span className="row-title">媒体库</span>
+                <span className="row-more">加载中…</span>
+              </div>
+              <SkeletonRow width={190} />
+            </section>
+          ))
+        : homeSections.map((section) => (
+            <HomeSectionRow key={section.id} section={section} />
+          ))}
+    </div>
+  )
+}
+
+function HomeSectionRow({ section }: { section: MediaSection }) {
+  const navigate = useNavigate()
+
+  return (
+    <section className="content-row">
+      <div className="row-head">
+        <span className="row-title">{section.title}</span>
+        <button
+          type="button"
+          className="row-more row-more-button"
+          onClick={() => navigate(`/view/${section.id}`)}
+        >
+          查看更多
+          <Icon name="chevron-right" size={14} color="currentColor" />
+        </button>
+      </div>
+      <MediaRail items={section.items} cardWidth={190} label={section.title} />
+    </section>
+  )
+}
+
+function MediaRail({
+  items,
+  cardWidth,
+  showProgress = false,
+  label,
+}: {
+  items: MediaItem[]
+  cardWidth: number
+  showProgress?: boolean
+  label: string
+}) {
+  const railRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div className="rail-shell">
+      <button
+        className="rail-nav rail-nav-left"
+        aria-label={`${label}向左滚动`}
+        onClick={() => scrollRailByPage(railRef.current, 'left')}
+      >
+        <Icon name="chevron-left" size={22} color="currentColor" />
+      </button>
+      <div className="row-rail" ref={railRef}>
+        {items.map((item) => (
+          <PosterCard key={item.id} item={item} width={cardWidth} showProgress={showProgress} />
+        ))}
+      </div>
+      <button
+        className="rail-nav rail-nav-right"
+        aria-label={`${label}向右滚动`}
+        onClick={() => scrollRailByPage(railRef.current, 'right')}
+      >
+        <Icon name="chevron-right" size={22} color="currentColor" />
+      </button>
     </div>
   )
 }

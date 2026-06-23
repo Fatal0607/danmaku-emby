@@ -16,7 +16,7 @@ export interface EmbyServer {
   createdAt: number
 }
 
-export type EmbyItemType = 'Movie' | 'Series' | 'Season' | 'Episode'
+export type EmbyItemType = 'Movie' | 'Series' | 'Season' | 'Episode' | 'Video'
 
 export interface EmbyImageTags {
   primary?: string

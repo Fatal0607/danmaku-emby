@@ -23,7 +23,5 @@ function handle<T>(channel: string, fn: (...args: unknown[]) => Promise<T> | T):
 
 export function registerPlayerIpc(controller: PlayerController): void {
   handle(CH.PLAYER_LOAD, (req) => controller.load(req as PlayerLoadRequest))
-  handle(CH.PLAYER_CMD, (cmd) => {
-    controller.command(cmd as PlayerCommand)
-  })
+  handle(CH.PLAYER_CMD, (cmd) => controller.command(cmd as PlayerCommand))
 }

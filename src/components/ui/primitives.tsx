@@ -3,11 +3,27 @@ import './primitives.css'
 
 /* ---- Traffic lights (macOS window controls) ---- */
 export function TrafficLights({ style }: { style?: CSSProperties }) {
+  const controls = typeof window !== 'undefined' ? window.api?.window : undefined
   return (
-    <div className="traffic-lights" style={style} aria-hidden="true">
-      <span className="tl tl-red" />
-      <span className="tl tl-yellow" />
-      <span className="tl tl-green" />
+    <div className="traffic-lights" style={style} aria-hidden={!controls}>
+      <button
+        type="button"
+        className="tl tl-red"
+        aria-label="关闭窗口"
+        onClick={() => controls?.close()}
+      />
+      <button
+        type="button"
+        className="tl tl-yellow"
+        aria-label="最小化窗口"
+        onClick={() => controls?.minimize()}
+      />
+      <button
+        type="button"
+        className="tl tl-green"
+        aria-label="缩放窗口"
+        onClick={() => controls?.toggleMaximize()}
+      />
     </div>
   )
 }

@@ -5,6 +5,8 @@ import {
   isEvent,
   parseLine,
 } from '@/../electron/main/player/mpv/protocol'
+import { TICKS_PER_SECOND } from '@shared/types/emby'
+import { buildLoadfileCommand, buildMpvWindowArgs } from '@/../electron/main/player/MpvEngine'
 
 describe('mpv protocol codec', () => {
   test('encodeCommand emits a newline-terminated request', () => {
@@ -39,5 +41,34 @@ describe('mpv protocol codec', () => {
   test('isEvent distinguishes notifications from command replies', () => {
     expect(isEvent({ event: 'end-file' })).toBe(true)
     expect(isEvent({ request_id: 1, error: 'success' })).toBe(false)
+  })
+
+  test('buildLoadfileCommand includes playlist index before start options', () => {
+    expect(
+      buildLoadfileCommand({
+        url: 'https://emby/video.mkv',
+        startTicks: 266 * TICKS_PER_SECOND,
+      }),
+    ).toEqual(['loadfile', 'https://emby/video.mkv', 'replace', -1, { start: '266' }])
+  })
+
+  test('buildMpvWindowArgs aligns the mpv window to the Electron overlay', () => {
+    const args = buildMpvWindowArgs({
+      bounds: { x: 12.4, y: 34.6, width: 1440.2, height: 900.3 },
+    })
+    expect(args).toContain('--autofit-larger=1440x900')
+    expect(args).toContain('--geometry=50%:50%')
+    expect(args).toContain('--ontop')
+  })
+
+  test('buildMpvWindowArgs embeds into a native window when an id is available', () => {
+    const args = buildMpvWindowArgs({
+      bounds: { x: 12.4, y: 34.6, width: 1440.2, height: 900.3 },
+      embedWindowId: '123456',
+    })
+    expect(args).toContain('--wid=123456')
+    expect(args).not.toContain('--ontop')
+    expect(args.some((arg) => arg.startsWith('--autofit-larger='))).toBe(false)
+    expect(args.some((arg) => arg.startsWith('--geometry='))).toBe(false)
   })
 })

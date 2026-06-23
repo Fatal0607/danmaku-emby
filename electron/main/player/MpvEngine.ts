@@ -15,6 +15,21 @@ import type { MpvEvent } from './mpv/protocol'
 // Observed-property ids (docs 03 §3.4): mpv echoes these back on property-change.
 const OBSERVE = { TIME: 1, DURATION: 2, PAUSE: 3, EOF: 4 } as const
 
+export interface MpvVideoWindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface MpvEngineOptions extends Omit<MpvIpcOptions, 'extraArgs'> {
+  /** Current Electron overlay window bounds in screen pixels. */
+  getVideoWindowBounds?: () => MpvVideoWindowBounds | undefined
+  /** Native window/view id that mpv can render into via --wid. */
+  getEmbedWindowId?: () => string | undefined
+  extraArgs?: MpvIpcOptions['extraArgs']
+}
+
 /**
  * libmpv-backed engine via JSON IPC (docs 03 §3.4, L1: mpv child window + ASS
  * overlay). Control commands dispatch to mpv (`loadfile`, `set_property pause`,
@@ -32,12 +47,18 @@ export class MpvEngine implements PlayerEngine {
     ended: false,
   }
 
-  constructor(opts: MpvIpcOptions = {}) {
+  constructor(opts: MpvEngineOptions = {}) {
     // hwdec first so a caller-supplied --hwdec (e.g. headless tests) wins by
     // mpv's last-flag-wins rule.
     this.client = new MpvIpcClient({
       ...opts,
-      extraArgs: ['--hwdec=videotoolbox', ...(opts.extraArgs ?? [])],
+      extraArgs: () => [
+        ...buildMpvWindowArgs({
+          bounds: opts.getVideoWindowBounds?.(),
+          embedWindowId: opts.getEmbedWindowId?.(),
+        }),
+        ...(typeof opts.extraArgs === 'function' ? opts.extraArgs() : (opts.extraArgs ?? [])),
+      ],
     })
   }
 
@@ -61,9 +82,7 @@ export class MpvEngine implements PlayerEngine {
   async load(src: PlaybackSource): Promise<void> {
     await this.connect()
     this.state = { timeSec: 0, durationSec: 0, paused: false, ended: false }
-    const startSec = src.startTicks ? src.startTicks / TICKS_PER_SECOND : 0
-    const options = startSec > 0 ? [`start=${startSec}`] : []
-    await this.client.command('loadfile', src.url, 'replace', ...options)
+    await this.client.command(...buildLoadfileCommand(src))
   }
 
   play(): void {
@@ -72,6 +91,10 @@ export class MpvEngine implements PlayerEngine {
 
   pause(): void {
     void this.client.setProperty('pause', true)
+  }
+
+  stop(): void {
+    void this.client.command('stop')
   }
 
   seek(seconds: number): void {
@@ -145,4 +168,36 @@ export class MpvEngine implements PlayerEngine {
   protected emit(event: PlayerEventName, payload: PlayerStateEvent): void {
     for (const cb of this.listeners.get(event) ?? []) cb(payload)
   }
+}
+
+export function buildLoadfileCommand(src: Pick<PlaybackSource, 'url' | 'startTicks'>): unknown[] {
+  const startSec = src.startTicks ? src.startTicks / TICKS_PER_SECOND : 0
+  if (startSec <= 0) return ['loadfile', src.url, 'replace']
+  // mpv command syntax is: loadfile url [flags] [index] [options].
+  // The playlist index must be present before the options map.
+  return ['loadfile', src.url, 'replace', -1, { start: String(startSec) }]
+}
+
+export interface MpvWindowArgsOptions {
+  bounds?: MpvVideoWindowBounds
+  embedWindowId?: string
+}
+
+export function buildMpvWindowArgs(options: MpvWindowArgsOptions = {}): string[] {
+  const args = [
+    '--hwdec=videotoolbox',
+    '--border=no',
+    '--force-window=yes',
+  ]
+  if (options.embedWindowId) return [...args, '--vo=gpu', `--wid=${options.embedWindowId}`]
+
+  const fallbackArgs = [...args, '--ontop']
+  const bounds = options.bounds
+  if (!bounds) return [...fallbackArgs, '--autofit-larger=1280x720', '--geometry=50%:50%']
+
+  const width = Math.max(320, Math.round(bounds.width))
+  const height = Math.max(180, Math.round(bounds.height))
+  // macOS mpv's absolute +x+y geometry is less reliable across spaces/displays.
+  // Size the L1/L2 video window to the Electron overlay and let mpv center it.
+  return [...fallbackArgs, `--autofit-larger=${width}x${height}`, '--geometry=50%:50%']
 }

@@ -19,7 +19,7 @@ interface UIState {
 }
 
 export const useUI = create<UIState>((set) => ({
-  currentServerId: 'living-room',
+  currentServerId: '',
   sidebarCollapsed: false,
   danmaku: {
     enabled: true,

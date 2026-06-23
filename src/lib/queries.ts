@@ -16,6 +16,8 @@ export const qk = {
   servers: ['servers'] as const,
   continueWatching: (s: string) => ['continueWatching', s] as const,
   recentlyAdded: (s: string) => ['recentlyAdded', s] as const,
+  homeSections: (s: string) => ['homeSections', s] as const,
+  viewSection: (s: string, id: string) => ['viewSection', s, id] as const,
   library: (s: string, k: MediaKind) => ['library', s, k] as const,
   item: (s: string, id: string) => ['item', s, id] as const,
   episodes: (s: string, id: string) => ['episodes', s, id] as const,
@@ -52,6 +54,22 @@ export function useRecentlyAdded(serverId?: string) {
     queryKey: qk.recentlyAdded(serverId ?? ''),
     queryFn: () => ds().recentlyAdded(serverId!),
     enabled: !!serverId,
+  })
+}
+
+export function useHomeSections(serverId?: string) {
+  return useQuery({
+    queryKey: qk.homeSections(serverId ?? ''),
+    queryFn: () => ds().homeSections(serverId!),
+    enabled: !!serverId,
+  })
+}
+
+export function useViewSection(serverId: string | undefined, viewId: string) {
+  return useQuery({
+    queryKey: qk.viewSection(serverId ?? '', viewId),
+    queryFn: () => ds().viewSection(serverId!, viewId),
+    enabled: !!serverId && !!viewId,
   })
 }
 

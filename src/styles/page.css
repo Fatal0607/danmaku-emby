@@ -45,6 +45,7 @@
 .row-head {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -55,15 +56,69 @@
   letter-spacing: -0.01em;
 }
 .row-more {
+  margin-left: auto;
   font-size: var(--text-sm);
   color: var(--accent-bright);
+}
+.row-more-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-bright);
+  font: inherit;
+  cursor: pointer;
+}
+.row-more-button:hover {
+  color: #fff;
 }
 .row-rail {
   display: flex;
   gap: 20px;
   overflow-x: auto;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
+  padding-bottom: 2px;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+.row-rail::-webkit-scrollbar {
+  display: none;
+}
+.rail-shell {
+  position: relative;
+}
+.rail-nav {
+  position: absolute;
+  top: 42%;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 11px;
+  background: rgba(10, 13, 18, 0.55);
+  color: #fff;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+.rail-nav:hover {
+  background: var(--surface-2);
+}
+.rail-nav:active {
+  transform: translateY(-50%) scale(0.96);
+}
+.rail-nav-left {
+  left: -18px;
+}
+.rail-nav-right {
+  right: -18px;
 }
 
 /* grid */
@@ -73,10 +128,45 @@
   gap: 28px 24px;
 }
 
+.page-titleline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.page-back-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: 1px solid var(--hairline-strong);
+  background: rgba(10, 13, 18, 0.55);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.page-back-button:hover {
+  background: var(--surface-2);
+}
+.page-empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
 .section-label {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--text-tertiary);
   text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .rail-nav {
+    display: none;
+  }
 }

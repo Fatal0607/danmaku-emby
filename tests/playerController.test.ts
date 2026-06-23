@@ -19,9 +19,11 @@ class FakeEngine implements PlayerEngine {
   ass?: string
   play = vi.fn()
   pause = vi.fn()
+  stop = vi.fn()
   seek = vi.fn()
   setAudioTrack = vi.fn()
   setSubtitle = vi.fn()
+  setFrameSize = vi.fn()
   dispose = vi.fn()
   private readonly handlers = new Map<PlayerEventName, Array<(s: PlayerStateEvent) => void>>()
 
@@ -123,6 +125,23 @@ describe('PlayerController', () => {
     expect(res.danmakuCount).toBe(0)
   })
 
+  test('danmaku overlay failure does not abort playback', async () => {
+    const engine = new FakeEngine()
+    const emby = fakeEmby()
+    const danmaku: DanmakuOverlaySource = {
+      autoMatch: vi.fn(async () => {
+        throw new Error('bad provider response')
+      }),
+      toAss: vi.fn(() => 'ASS-DOC'),
+    }
+    const controller = new PlayerController(engine, emby, danmaku, { send: () => {} })
+    const res = await controller.load({ serverId: 'srv', itemId: 'i' })
+
+    expect(engine.loaded).toBe(SRC)
+    expect(engine.play).toHaveBeenCalled()
+    expect(res.danmakuCount).toBe(0)
+  })
+
   test('time updates push state and throttle progress reports', async () => {
     let now = 0
     const { engine, emby, pushes, controller } = harness({ now: () => now, progressIntervalMs: 1000 })
@@ -162,15 +181,33 @@ describe('PlayerController', () => {
     expect(engine.dispose).toHaveBeenCalled()
   })
 
+  test('stop command halts playback and reports stop', async () => {
+    const { engine, emby, pushes, controller } = harness()
+    await controller.load({ serverId: 'srv', itemId: 'i' })
+    engine.fire('timeupdate', { timeSec: 12, durationSec: 60, paused: false, ended: false })
+
+    await controller.command({ type: 'stop' })
+
+    expect(engine.stop).toHaveBeenCalled()
+    expect(pushes.at(-1)).toMatchObject({ paused: true, ended: false })
+    expect(emby.reports.filter((r) => r.event === 'stop')).toHaveLength(1)
+    expect(emby.reports.at(-1)).toMatchObject({
+      event: 'stop',
+      positionTicks: 12 * TICKS_PER_SECOND,
+    })
+  })
+
   test('command dispatches to the engine', async () => {
     const { engine, controller } = harness()
     await controller.load({ serverId: 'srv', itemId: 'i' })
     controller.command({ type: 'seek', seconds: 42 })
     controller.command({ type: 'pause' })
     controller.command({ type: 'setSubtitle', index: null })
+    controller.command({ type: 'setFrameSize', width: 1440, height: 900 })
     expect(engine.seek).toHaveBeenCalledWith(42)
     expect(engine.pause).toHaveBeenCalled()
     expect(engine.setSubtitle).toHaveBeenCalledWith(null)
+    expect(engine.setFrameSize).toHaveBeenCalledWith(1440, 900)
   })
 
   test('a failing progress report never breaks load', async () => {

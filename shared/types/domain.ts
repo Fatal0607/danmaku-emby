@@ -32,6 +32,14 @@ export interface MediaItem {
   overview: string
   /** 0–1 watch progress for "continue watching". */
   progress?: number
+  /** Runtime in seconds, when known from Emby. */
+  durationSec?: number
+  /** Resume position from Emby, passed back to PLAYER_LOAD. */
+  playbackPositionTicks?: number
+  /** Series id for episode items; used to fetch sibling episodes on detail pages. */
+  seriesId?: string
+  seasonNumber?: number
+  episodeNumber?: number
   episodeLabel?: string
   durationLabel?: string
   quality?: string
@@ -52,6 +60,13 @@ export interface Episode {
   progress?: number
   danmaku: DanmakuStatus
   danmakuCount?: number
+}
+
+export interface MediaSection {
+  id: string
+  title: string
+  collectionType?: string
+  items: MediaItem[]
 }
 
 export interface DanmakuComment {
