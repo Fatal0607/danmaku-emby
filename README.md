@@ -71,9 +71,11 @@ electron/main/
 │   ├── DanmakuService.ts     # orchestration: auto-match → cache-first fetch → toAss
 │   ├── MatchService.ts       # /match + mapping memory (manual wins) + episode extrapolation
 │   ├── errors.ts             # DanmakuError codes
+│   ├── net/decoders/biliXml.ts       # bilibili list.so XML → canonical {p,m}
 │   ├── providers/
 │   │   ├── DanmakuProvider.ts        # provider interface (dandanplay/B站/腾讯)
-│   │   └── dandanplay/               # provider + signing + raw→internal mapping
+│   │   ├── dandanplay/               # provider + AppId signing + mapping
+│   │   └── bilibili/                 # provider + WBI signing + mapping
 │   └── render/
 │       ├── parseComment.ts   # {p,m} parsing, BGR color, ASS escaping
 │       └── toAss.ts          # {p,m} → ASS with lane allocation (mpv L1)
@@ -99,10 +101,11 @@ provide caching, loading, and error states.
 | Renderer wired to live Emby IPC (TanStack Query, mock fallback in browser) | ✅ done |
 | Emby layer verified against a live server (auth → browse → PlaybackInfo direct-play) | ✅ smoke-tested |
 | Danmaku Phase 2: dandanplay provider + MatchService + DanmakuService (cache, manual-wins, toAss) | ✅ implemented, unit-tested |
+| Danmaku Phase 3: bilibili provider (WBI signing, XML decoder) | ✅ implemented, unit-tested (WBI verified vs live nav) |
 | libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
 | dandanplay live (needs AppId signing or self-hosted proxy — official returns 403 unsigned) | ⬜ needs credentials |
-| Danmaku Phase 3: B站 / 腾讯 providers + manifest hot-update | ⬜ later |
+| Multi-provider registry + 腾讯 provider + manifest hot-update | ⬜ later |
 | Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |
 
-Run `npm test` for the Main-process unit tests (43 passing: DeviceProfileBuilder, toAss,
-EmbyService, dandanplay signing/mapping, MatchService, DanmakuService).
+Run `npm test` for the Main-process unit tests (56 passing: DeviceProfileBuilder, toAss,
+EmbyService, dandanplay signing/mapping, MatchService, DanmakuService, bilibili WBI/XML/provider).
