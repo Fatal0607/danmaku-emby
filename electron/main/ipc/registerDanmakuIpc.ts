@@ -29,6 +29,13 @@ function handle<T>(channel: string, fn: (...args: unknown[]) => Promise<T> | T):
 
 export function registerDanmakuIpc(services: AppServices): void {
   handle(CH.DM_PROVIDERS, () => services.danmakuListProviders())
+  handle(CH.DM_LIST_CONFIGS, () => services.danmakuListProviderConfigs())
+  handle(CH.DM_SET_ENABLED, (id, enabled) =>
+    services.danmakuSetProviderEnabled(id as string, enabled as boolean),
+  )
+  handle(CH.DM_REORDER, (orderedIds) =>
+    services.danmakuReorderProviders(orderedIds as string[]),
+  )
   handle(CH.DM_AUTO_MATCH, (input) => services.danmakuAutoMatch(input as DanmakuMatchInput))
   handle(CH.DM_SEARCH, (provider, keyword) =>
     services.danmakuSearch(provider as ProviderId, keyword as string),

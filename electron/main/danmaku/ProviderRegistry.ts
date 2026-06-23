@@ -18,10 +18,10 @@ export interface ProviderInfo {
 }
 
 export class ProviderRegistry {
-  private readonly entries: RegisteredProvider[]
+  private entries: RegisteredProvider[]
 
   constructor(entries: RegisteredProvider[]) {
-    this.entries = [...entries].sort((a, b) => a.sortOrder - b.sortOrder)
+    this.entries = this.sorted(entries)
   }
 
   /** An enabled provider by id, or undefined if absent/disabled. */
@@ -40,5 +40,23 @@ export class ProviderRegistry {
       enabled: e.enabled,
       sortOrder: e.sortOrder,
     }))
+  }
+
+  /** Toggle a provider on/off at runtime (mirrors the persisted config). */
+  setEnabled(id: ProviderId, enabled: boolean): void {
+    const entry = this.entries.find((e) => e.provider.id === id)
+    if (entry) entry.enabled = enabled
+  }
+
+  /** Update a provider's priority and re-sort. */
+  setSortOrder(id: ProviderId, sortOrder: number): void {
+    const entry = this.entries.find((e) => e.provider.id === id)
+    if (!entry) return
+    entry.sortOrder = sortOrder
+    this.entries = this.sorted(this.entries)
+  }
+
+  private sorted(entries: RegisteredProvider[]): RegisteredProvider[] {
+    return [...entries].sort((a, b) => a.sortOrder - b.sortOrder)
   }
 }

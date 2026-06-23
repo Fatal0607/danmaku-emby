@@ -17,19 +17,26 @@ import type {
   DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
+  ProviderConfig,
 } from '@shared/types/danmaku'
 import { Store } from './store/Store'
 import { SecretService } from './secret/SecretService'
 import { EmbyService } from './emby/EmbyService'
 import { HttpFetchLike } from './net/FetchLike'
 import { DanmakuService } from './danmaku/DanmakuService'
-import { ProviderRegistry, type ProviderInfo } from './danmaku/ProviderRegistry'
+import {
+  ProviderRegistry,
+  type ProviderInfo,
+  type RegisteredProvider,
+} from './danmaku/ProviderRegistry'
 import {
   DandanplayProvider,
   type DandanplayConfig,
 } from './danmaku/providers/dandanplay/DandanplayProvider'
 import { BilibiliProvider } from './danmaku/providers/bilibili/BilibiliProvider'
 import { TencentProvider } from './danmaku/providers/tencent/TencentProvider'
+import type { DanmakuSourceProvider } from './danmaku/providers/DanmakuProvider'
+import { DEFAULT_PROVIDER_CONFIGS } from './danmaku/providers/defaults'
 import type { AssOptions } from './danmaku/render/toAss'
 
 // Composition root for the Main process. Builds the Store, SecretService, and
@@ -42,6 +49,7 @@ export class AppServices {
   readonly emby: EmbyService
   readonly danmaku: DanmakuService
   readonly deviceId: string
+  private readonly registry: ProviderRegistry
 
   constructor(dbPath: string) {
     this.store = new Store(dbPath)
@@ -55,14 +63,27 @@ export class AppServices {
       getToken: (serverId) => this.secrets.getToken(serverId),
     })
 
+    // Provider instances keyed by manifest; the registry's enabled/order come
+    // from persisted provider_configs (seeded with the built-ins on first run).
     const ddpConfig = this.store.preferences.get<DandanplayConfig>('dandanplayConfig', {})
-    const registry = new ProviderRegistry([
-      { provider: new DandanplayProvider(fetcher, ddpConfig), enabled: true, sortOrder: 0 },
-      { provider: new BilibiliProvider(fetcher), enabled: true, sortOrder: 1 },
-      { provider: new TencentProvider(fetcher), enabled: true, sortOrder: 2 },
-    ])
+    const providerByManifest: Partial<Record<ProviderId, DanmakuSourceProvider>> = {
+      dandanplay: new DandanplayProvider(fetcher, ddpConfig),
+      bilibili: new BilibiliProvider(fetcher),
+      tencent: new TencentProvider(fetcher),
+    }
+
+    this.store.providerConfigs.seedDefaults(DEFAULT_PROVIDER_CONFIGS)
+    const entries = this.store.providerConfigs
+      .list()
+      .map((c): RegisteredProvider | null => {
+        const provider = providerByManifest[c.manifestId]
+        return provider ? { provider, enabled: c.enabled, sortOrder: c.sortOrder } : null
+      })
+      .filter((e): e is RegisteredProvider => e !== null)
+
+    this.registry = new ProviderRegistry(entries)
     this.danmaku = new DanmakuService(
-      registry,
+      this.registry,
       this.store.danmakuMap,
       this.store.danmakuCache,
     )
@@ -122,6 +143,27 @@ export class AppServices {
 
   danmakuListProviders(): ProviderInfo[] {
     return this.danmaku.listProviders()
+  }
+
+  /** Persisted provider configs for the settings page (name/enabled/order). */
+  danmakuListProviderConfigs(): ProviderConfig[] {
+    return this.store.providerConfigs.list()
+  }
+
+  /** Toggle a provider, persisting and reflecting it in the live registry. */
+  danmakuSetProviderEnabled(id: string, enabled: boolean): ProviderConfig[] {
+    this.store.providerConfigs.setEnabled(id, enabled)
+    this.registry.setEnabled(id as ProviderId, enabled)
+    return this.store.providerConfigs.list()
+  }
+
+  /** Reorder providers by an explicit id list; index becomes the sort order. */
+  danmakuReorderProviders(orderedIds: string[]): ProviderConfig[] {
+    orderedIds.forEach((id, index) => {
+      this.store.providerConfigs.setSortOrder(id, index)
+      this.registry.setSortOrder(id as ProviderId, index)
+    })
+    return this.store.providerConfigs.list()
   }
 
   danmakuAutoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {

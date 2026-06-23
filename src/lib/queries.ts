@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ServerInput } from '@shared/types/emby'
 import type { MediaKind } from '@shared/types/domain'
-import type { DanmakuMatchInput, DanmakuProvider } from '@shared/types/danmaku'
+import type { DanmakuMatchInput, DanmakuProvider, ProviderConfig } from '@shared/types/danmaku'
 import { useUI } from './store'
 import { getDataSource } from './dataSource'
 import { getDanmakuSource, type ManualFetchArgs } from './danmakuSource'
@@ -21,6 +21,7 @@ export const qk = {
   episodes: (s: string, id: string) => ['episodes', s, id] as const,
   search: (s: string, term: string) => ['search', s, term] as const,
   danmakuProviders: ['danmakuProviders'] as const,
+  danmakuConfigs: ['danmakuConfigs'] as const,
   danmakuTrack: (s: string, id: string) => ['danmakuTrack', s, id] as const,
   danmakuSearch: (term: string) => ['danmakuSearch', term] as const,
   danmakuEpisodes: (p: string, sid: string) => ['danmakuEpisodes', p, sid] as const,
@@ -106,6 +107,34 @@ export function useRemoveServer() {
 
 export function useDanmakuProviders() {
   return useQuery({ queryKey: qk.danmakuProviders, queryFn: () => dds().listProviders() })
+}
+
+export function useDanmakuConfigs() {
+  return useQuery({ queryKey: qk.danmakuConfigs, queryFn: () => dds().listConfigs() })
+}
+
+/** Toggling or reordering a source changes its persisted config and the live
+ * registry, so refresh configs/providers and drop stale search results. */
+function useProviderConfigMutation<TArgs>(fn: (args: TArgs) => Promise<ProviderConfig[]>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (configs) => {
+      qc.setQueryData(qk.danmakuConfigs, configs)
+      qc.invalidateQueries({ queryKey: qk.danmakuProviders })
+      qc.invalidateQueries({ queryKey: ['danmakuSearch'] })
+    },
+  })
+}
+
+export function useSetProviderEnabled() {
+  return useProviderConfigMutation((args: { id: string; enabled: boolean }) =>
+    dds().setProviderEnabled(args.id, args.enabled),
+  )
+}
+
+export function useReorderProviders() {
+  return useProviderConfigMutation((orderedIds: string[]) => dds().reorderProviders(orderedIds))
 }
 
 /** Auto-match the playing item to a danmaku track (cache-first in Main). */

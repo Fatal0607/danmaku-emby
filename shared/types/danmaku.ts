@@ -43,6 +43,8 @@ export interface ProviderConfig {
   name: string
   enabled: boolean
   configValues: Record<string, unknown>
+  /** Auto-match priority; lower runs first (docs 05 provider_configs). */
+  sortOrder: number
 }
 
 /** Persisted Emby-item → danmaku-track mapping (docs 05 danmaku_map). */

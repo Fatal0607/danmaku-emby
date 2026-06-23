@@ -19,6 +19,7 @@ import type {
   DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
+  ProviderConfig,
 } from '@shared/types/danmaku'
 import type { ProviderInfo } from '../main/danmaku/ProviderRegistry'
 
@@ -60,6 +61,11 @@ const embyApi = {
 
 const danmakuApi = {
   listProviders: (): Promise<IpcResult<ProviderInfo[]>> => ipcRenderer.invoke(CH.DM_PROVIDERS),
+  listConfigs: (): Promise<IpcResult<ProviderConfig[]>> => ipcRenderer.invoke(CH.DM_LIST_CONFIGS),
+  setProviderEnabled: (id: string, enabled: boolean): Promise<IpcResult<ProviderConfig[]>> =>
+    ipcRenderer.invoke(CH.DM_SET_ENABLED, id, enabled),
+  reorderProviders: (orderedIds: string[]): Promise<IpcResult<ProviderConfig[]>> =>
+    ipcRenderer.invoke(CH.DM_REORDER, orderedIds),
   autoMatch: (input: DanmakuMatchInput): Promise<IpcResult<DanmakuTrack | null>> =>
     ipcRenderer.invoke(CH.DM_AUTO_MATCH, input),
   search: (provider: ProviderId, keyword: string): Promise<IpcResult<DanmakuSeason[]>> =>

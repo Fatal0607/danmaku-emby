@@ -50,6 +50,9 @@ export const CH = {
   PLAYER_STATE: 'player:state',
   // Danmaku
   DM_PROVIDERS: 'danmaku:listProviders',
+  DM_LIST_CONFIGS: 'danmaku:listConfigs',
+  DM_SET_ENABLED: 'danmaku:setProviderEnabled',
+  DM_REORDER: 'danmaku:reorderProviders',
   DM_AUTO_MATCH: 'danmaku:autoMatch',
   DM_SEARCH: 'danmaku:search',
   DM_EPISODES: 'danmaku:episodes',

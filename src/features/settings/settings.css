@@ -102,6 +102,38 @@
   flex: none;
 }
 
+/* danmaku source rows */
+.settings-source-rank {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.settings-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-source-move {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast);
+}
+.settings-source-move:hover:not(:disabled) {
+  background: var(--surface-3, var(--surface-2));
+  border-color: var(--hairline-strong);
+}
+.settings-source-move:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* server rows */
 .settings-server {
   display: flex;

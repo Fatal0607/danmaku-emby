@@ -1,10 +1,22 @@
 import { useState } from 'react'
+import type { DanmakuProvider } from '@shared/types/danmaku'
 import { Icon } from '@/components/ui/Icon'
 import { Toggle, Segmented, Slider, Tag } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { servers } from '@/lib/mockData'
+import {
+  useDanmakuConfigs,
+  useReorderProviders,
+  useSetProviderEnabled,
+} from '@/lib/queries'
 import '@/styles/page.css'
 import './settings.css'
+
+const PROVIDER_HINTS: Record<DanmakuProvider, string> = {
+  dandanplay: 'dandanplay 综合弹幕库',
+  bilibili: '需要登录以获取完整弹幕',
+  tencent: '部分地区受限',
+}
 
 const SECTIONS = ['服务器', '播放', '弹幕', '关于'] as const
 type Section = (typeof SECTIONS)[number]
@@ -112,17 +124,7 @@ export function Settings() {
                   />
                 </Row>
               </Group>
-              <Group title="弹幕来源" hint="自动匹配的优先顺序">
-                <Row label="弹弹play" hint="dandanplay 综合弹幕库">
-                  <Toggle checked onChange={() => {}} />
-                </Row>
-                <Row label="哔哩哔哩" hint="需要登录以获取完整弹幕">
-                  <Toggle checked onChange={() => {}} />
-                </Row>
-                <Row label="腾讯视频" hint="部分地区受限">
-                  <Toggle checked={false} onChange={() => {}} />
-                </Row>
-              </Group>
+              <ProviderSources />
             </>
           )}
 
@@ -173,5 +175,59 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
       </div>
       <div className="settings-row-control">{children}</div>
     </div>
+  )
+}
+
+/** Danmaku source list — persisted enable/priority backed by provider_configs. */
+function ProviderSources() {
+  const { data: configs = [] } = useDanmakuConfigs()
+  const setEnabled = useSetProviderEnabled()
+  const reorder = useReorderProviders()
+
+  const move = (index: number, dir: -1 | 1) => {
+    const target = index + dir
+    if (target < 0 || target >= configs.length) return
+    const next = [...configs]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    reorder.mutate(next.map((c) => c.id))
+  }
+
+  return (
+    <Group title="弹幕来源" hint="自动匹配的优先顺序,可开关与排序">
+      {configs.map((config, index) => (
+        <div key={config.id} className="settings-row">
+          <div className="settings-row-meta">
+            <span className="settings-row-icon settings-source-rank">{index + 1}</span>
+            <div>
+              <div className="settings-row-label">{config.name}</div>
+              <div className="settings-row-hint">{PROVIDER_HINTS[config.manifestId]}</div>
+            </div>
+          </div>
+          <div className="settings-row-control settings-source-actions">
+            <button
+              className="settings-source-move"
+              onClick={() => move(index, -1)}
+              disabled={index === 0 || reorder.isPending}
+              aria-label="上移"
+            >
+              <Icon name="chevron-down" size={15} color="var(--text-muted)" style={{ transform: 'rotate(180deg)' }} />
+            </button>
+            <button
+              className="settings-source-move"
+              onClick={() => move(index, 1)}
+              disabled={index === configs.length - 1 || reorder.isPending}
+              aria-label="下移"
+            >
+              <Icon name="chevron-down" size={15} color="var(--text-muted)" />
+            </button>
+            <Toggle
+              checked={config.enabled}
+              onChange={(v) => setEnabled.mutate({ id: config.id, enabled: v })}
+              label={`${config.name} 开关`}
+            />
+          </div>
+        </div>
+      ))}
+    </Group>
   )
 }

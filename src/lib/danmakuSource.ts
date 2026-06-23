@@ -4,6 +4,7 @@ import type {
   DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
+  ProviderConfig,
 } from '@shared/types/danmaku'
 import type { ProviderInfo } from '../../electron/main/danmaku/ProviderRegistry'
 import { getApi, isElectron, unwrap } from './ipc'
@@ -24,6 +25,10 @@ export interface ManualFetchArgs {
 
 export interface DanmakuSource {
   listProviders(): Promise<ProviderInfo[]>
+  /** Persisted provider configs (name/enabled/order) for the settings page. */
+  listConfigs(): Promise<ProviderConfig[]>
+  setProviderEnabled(id: string, enabled: boolean): Promise<ProviderConfig[]>
+  reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]>
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null>
   /** Search every enabled provider and merge their seasons. */
   searchAll(keyword: string): Promise<DanmakuSeason[]>
@@ -34,6 +39,18 @@ export interface DanmakuSource {
 class ElectronDanmakuSource implements DanmakuSource {
   listProviders(): Promise<ProviderInfo[]> {
     return unwrap(getApi().danmaku.listProviders())
+  }
+
+  listConfigs(): Promise<ProviderConfig[]> {
+    return unwrap(getApi().danmaku.listConfigs())
+  }
+
+  setProviderEnabled(id: string, enabled: boolean): Promise<ProviderConfig[]> {
+    return unwrap(getApi().danmaku.setProviderEnabled(id, enabled))
+  }
+
+  reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]> {
+    return unwrap(getApi().danmaku.reorderProviders(orderedIds))
   }
 
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
@@ -108,13 +125,42 @@ const MOCK_SEASONS: DanmakuSeason[] = [
   },
 ]
 
+// Mutable so toggles/reorder persist across the preview session.
+const mockConfigs: ProviderConfig[] = [
+  { id: 'dandanplay', manifestId: 'dandanplay', name: '弹弹play', enabled: true, configValues: {}, sortOrder: 0 },
+  { id: 'bilibili', manifestId: 'bilibili', name: '哔哩哔哩', enabled: true, configValues: {}, sortOrder: 1 },
+  { id: 'tencent', manifestId: 'tencent', name: '腾讯视频', enabled: true, configValues: {}, sortOrder: 2 },
+]
+
+function sortedMockConfigs(): ProviderConfig[] {
+  return [...mockConfigs].sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
 class MockDanmakuSource implements DanmakuSource {
   async listProviders(): Promise<ProviderInfo[]> {
-    return [
-      { id: 'dandanplay', enabled: true, sortOrder: 0 },
-      { id: 'bilibili', enabled: true, sortOrder: 1 },
-      { id: 'tencent', enabled: true, sortOrder: 2 },
-    ]
+    return sortedMockConfigs().map((c) => ({
+      id: c.manifestId,
+      enabled: c.enabled,
+      sortOrder: c.sortOrder,
+    }))
+  }
+
+  async listConfigs(): Promise<ProviderConfig[]> {
+    return sortedMockConfigs()
+  }
+
+  async setProviderEnabled(id: string, enabled: boolean): Promise<ProviderConfig[]> {
+    const config = mockConfigs.find((c) => c.id === id)
+    if (config) config.enabled = enabled
+    return sortedMockConfigs()
+  }
+
+  async reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]> {
+    orderedIds.forEach((id, index) => {
+      const config = mockConfigs.find((c) => c.id === id)
+      if (config) config.sortOrder = index
+    })
+    return sortedMockConfigs()
   }
 
   async autoMatch(): Promise<DanmakuTrack | null> {
@@ -122,10 +168,12 @@ class MockDanmakuSource implements DanmakuSource {
   }
 
   async searchAll(keyword: string): Promise<DanmakuSeason[]> {
+    const enabled = new Set(mockConfigs.filter((c) => c.enabled).map((c) => c.manifestId))
+    const pool = MOCK_SEASONS.filter((s) => enabled.has(s.provider))
     const term = keyword.trim()
-    if (!term) return MOCK_SEASONS
-    const matched = MOCK_SEASONS.filter((s) => s.title.includes(term))
-    return matched.length ? matched : MOCK_SEASONS
+    if (!term) return pool
+    const matched = pool.filter((s) => s.title.includes(term))
+    return matched.length ? matched : pool
   }
 
   async episodes(provider: ProviderId, seasonId: string): Promise<DanmakuEpisode[]> {
