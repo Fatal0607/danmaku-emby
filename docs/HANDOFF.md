@@ -14,9 +14,11 @@ better-sqlite3 + safeStorage(Keychain)**;播放引擎计划用 **libmpv**(尚未
 ```bash
 npm install          # 会编译 better-sqlite3 原生模块(需 macOS 工具链)
 npm run dev          # Vite 浏览器预览(走 mock 数据,无需 Electron)
-npm run electron:dev # 构建并启动 Electron 窗口(真实 IPC)
-npm run build        # tsc --noEmit + vite build
-npm test             # Vitest 单元测试(当前 91 通过 / 12 跳过)
+npm run electron:dev # vite build + build:electron + rebuild:electron + 启动窗口(真机已验证可启动)
+npm run build        # tsc --noEmit + vite build(渲染层)
+npm run build:electron # esbuild 打包 main+preload → dist-electron/
+npm test             # Vitest 单元测试(当前 91 通过 / 12 跳过;需 node ABI,见下)
+# ⚠️ 跑 GUI 后 better-sqlite3 是 Electron ABI,要全量测先 `npm run rebuild:node`
 ```
 
 真实平台冒烟测试默认跳过,凭据从环境变量读取(**绝不硬编码**):
@@ -54,6 +56,7 @@ MPV_SMOKE=1 npx vitest run tests/smoke/mpv.smoke.test.ts
 | 修复冷启动 bug:migration v1 重复建 `app_meta`(db.ts 已 bootstrap)导致新库 openDatabase 抛错 → 改 `IF NOT EXISTS` | ✅ 由 ProviderConfigRepo 单测暴露并修复 | 本次 |
 | **Spike A:libmpv 控制平面(JSON IPC)** — MpvIpcClient(spawn mpv + unix socket + 请求/响应关联 + 事件)、MpvEngine(loadfile/pause/seek/observe time-pos/eof + ASS overlay)、纯协议编解码 | ✅ **真机验证通过**(mpv v0.41.0:loadfile→time-pos 推进→seek 20s 命中→sub-add ASS 得 track-list/count=2→MpvEngine emit timeupdate);协议单测 5 例 + opt-in 真机冒烟 3 例 | 本次 |
 | **PlayerController + 播放 IPC + 进度回报(#6)** — 编排 resolvePlayback→engine.load→autoMatch 弹幕 ASS overlay→play;engine 事件→PLAYER_STATE 推送;time-pos 节流驱动 Emby start/progress/stop | ✅ 单测 7 例(含 stop 幂等竞态修复)+ 真机控制器冒烟(start,progress,stop 经真实 mpv)| 本次 |
+| **Electron 构建管线** — `electron/build.mjs`(esbuild 把 main→ESM、preload→CJS 打进 `dist-electron/`,externalize electron+better-sqlite3)+ `rebuild:electron`/`rebuild:node`(native ABI 切换)+ `electron:dev` 串起来 | ✅ **真机启动验证**:app 干净启动(DB 打开、IPC 注册、窗口常驻、无报错);native ABI 修复(NODE_MODULE_VERSION 141↔128)| 本次 |
 
 **关键验证事实**:
 - Emby 集成对真实生产服务器有效;2160p mkv 经宽松 DeviceProfile 走 **directPlay(非转码)**,印证"根治无声"路径。
@@ -74,8 +77,10 @@ MPV_SMOKE=1 npx vitest run tests/smoke/mpv.smoke.test.ts
    - 备注:`configValues` 已可持久化但暂未承载内容(dandanplay 凭据仍在 `preferences.dandanplayConfig`);未来按 provider 存配置可复用该字段。
 6. ✅ **进度回报接 mpv**(已完成,本次)— `PlayerController` 在 `electron/main/player/PlayerController.ts`,由 `time-pos` 事件节流(默认 10s)驱动 `EmbyService.reportProgress` 的 start/progress/stop;暂停/结束/dispose 各自上报;stop 幂等(同步清 current 防竞态重复)。注入式依赖(PlaybackResolver/DanmakuOverlaySource/StateSender)便于单测。
 7. **manifest 热更新**(docs 04 §4.3)、**E2E(Playwright)**、CookieAuthService(B站登录窗,docs 06 §6.3)。
-8. ⚠️ **Electron 构建管线缺失(阻塞真机 GUI 联调)** — `package.json` 的 `main` 指向 `dist-electron/main/index.js`,但 `vite.config.ts` 只构建渲染层(`dist/`),**没有任何步骤把 `electron/main`+`electron/preload` 的 TS 编进 `dist-electron/`**,故 `npm run electron:dev` 实际无法启动。要真机跑 GUI/播放联调,需先补编译(esbuild/tsup/electron-vite 之一,externalize `electron` 与 `better-sqlite3` 原生模块,产出 ESM)。这是 #3 剩余的「窗口嵌入」「Player.tsx 接真实播放」的前置。
-9. **Player.tsx 接真实播放** — 接 `window.api.player`(`load`/`command`/`onState`),用 `PLAYER_STATE` 的 `time-pos` 替换模拟播放头并驱动弹幕轴;浏览器无 `window.api` 时保留现有 mock 模拟。需 #8 + GUI 验证。
+8. ✅ **Electron 构建管线**(已完成,本次,真机启动验证)— `electron/build.mjs` 用 esbuild 把 `electron/main`→ESM(`dist-electron/main/index.js`)、`electron/preload`→CJS(`.cjs`)打包,externalize `electron`+`better-sqlite3`,alias `@shared`。脚本:`build:electron`、`rebuild:electron`(electron-rebuild)、`rebuild:node`(npm rebuild),`electron:dev = vite build && build:electron && rebuild:electron && electron .`。`app` 干净启动(DB/IPC/窗口均 OK)。
+   - ⚠️ **native ABI 双轨**:`better-sqlite3` 是原生模块,Electron(ABI 128)与系统 Node(ABI 141,跑 Vitest)不兼容。约定:跑 GUI 用 `electron:dev`(自动 rebuild:electron);跑全量测试用 `npm run rebuild:node && npm test`。`tests/providerConfig.test.ts` 已加 `runIf(sqliteOk)` 守卫——ABI 不匹配时自动跳过(不崩),其余测试不受影响。默认仓库状态保持 node ABI。
+9. **Player.tsx 接真实播放** — 接 `window.api.player`(`load`/`command`/`onState`),用 `PLAYER_STATE` 的 `time-pos` 替换模拟播放头并驱动弹幕轴;浏览器无 `window.api` 时保留现有 mock 模拟。现可真机 GUI 验证(`npm run electron:dev`)。
+10. **macOS 窗口嵌入(L2 透明叠加窗)** — 目前 mpv 开自有窗口(L1);用 `addChildWindow` 把透明 Electron 窗叠到 mpv 窗上画 HTML 控制条/弹幕(docs 03 §3.4)。
 
 ## 5. 代码地图(关键路径)
 
@@ -105,6 +110,7 @@ electron/main/
 └── ipc/                        # registerEmbyIpc + registerDanmakuIpc + registerPlayerIpc
 
 electron/preload/index.ts       # 白名单 typed bridge: window.api.{emby,danmaku,player}
+electron/build.mjs              # esbuild 打包 main(ESM)+preload(CJS)→ dist-electron/
 
 src/
 ├── hooks/useDebouncedValue.ts  # 通用防抖(手动匹配搜索用)
@@ -133,4 +139,4 @@ shared/types/                   # ipc(channels+信封)/emby/danmaku/domain — M
 ## 7. 一句话状态
 
 UI + Emby(真机)+ 三源弹幕逻辑层 + 弹幕接入播放器 UI + provider_configs 持久化 + mpv 控制平面(Spike A,真机)+ **PlayerController/播放 IPC/进度回报(#6,真机控制器冒烟)** 均已完成且单测覆盖(91 通过)。Main 侧播放链路(resolve→mpv→state 推送→进度回报)端到端打通。
-**下一步关键阻塞**:**补 Electron 构建管线(#8)**——目前没编译步骤产出 `dist-electron/`,`electron:dev` 跑不起来,这是真机 GUI 一切联调的前置。之后:① `Player.tsx` 接 `window.api.player` 真实播放(#9);② macOS 窗口嵌入(L2 透明叠加窗)。
+**Electron 构建管线已补、app 真机可启动(#8 ✅)**。下一步:① `Player.tsx` 接 `window.api.player` 真实播放(#9,现可 `electron:dev` GUI 验证);② macOS 窗口嵌入 L2 透明叠加窗(#10)。

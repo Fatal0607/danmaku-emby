@@ -8,8 +8,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:electron": "node electron/build.mjs",
     "preview": "vite preview",
-    "electron:dev": "vite build && electron .",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "electron:dev": "vite build && npm run build:electron && npm run rebuild:electron && electron .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -23,6 +26,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",

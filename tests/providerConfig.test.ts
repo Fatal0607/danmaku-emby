@@ -21,7 +21,19 @@ function repo(): ProviderConfigRepo {
   return new ProviderConfigRepo(openDatabase(':memory:'))
 }
 
-describe('ProviderConfigRepo', () => {
+// better-sqlite3 is native and ABI-bound to one runtime. When it's been built
+// for Electron (to run the app) it can't load under Vitest's Node, so skip the
+// real-DB suite instead of crashing; the registry suite below stays runtime-free.
+const sqliteOk = (() => {
+  try {
+    openDatabase(':memory:').close()
+    return true
+  } catch {
+    return false
+  }
+})()
+
+describe.runIf(sqliteOk)('ProviderConfigRepo', () => {
   test('seedDefaults inserts built-ins ordered by sortOrder', () => {
     const r = repo()
     r.seedDefaults(DEFAULTS)
