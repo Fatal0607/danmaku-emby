@@ -13,7 +13,9 @@ export const migrations: Migration[] = [
     version: 1,
     up: (db) => {
       db.exec(`
-        CREATE TABLE app_meta (
+        -- app_meta is bootstrapped by the migration runner (db.ts) so it can
+        -- track schemaVersion; guard against the double-create on a fresh DB.
+        CREATE TABLE IF NOT EXISTS app_meta (
           key   TEXT PRIMARY KEY,
           value TEXT NOT NULL
         );
