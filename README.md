@@ -102,10 +102,12 @@ provide caching, loading, and error states.
 | Emby layer verified against a live server (auth → browse → PlaybackInfo direct-play) | ✅ smoke-tested |
 | Danmaku Phase 2: dandanplay provider + MatchService + DanmakuService (cache, manual-wins, toAss) | ✅ implemented, unit-tested |
 | Danmaku Phase 3: bilibili provider (WBI signing, XML decoder) | ✅ implemented, unit-tested (WBI verified vs live nav) |
+| Multi-provider registry (dandanplay + bilibili routed by priority/id) | ✅ implemented, unit-tested |
 | libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
 | dandanplay live (needs AppId signing or self-hosted proxy — official returns 403 unsigned) | ⬜ needs credentials |
-| Multi-provider registry + 腾讯 provider + manifest hot-update | ⬜ later |
+| 腾讯 provider + manifest hot-update | ⬜ later |
 | Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |
 
-Run `npm test` for the Main-process unit tests (56 passing: DeviceProfileBuilder, toAss,
-EmbyService, dandanplay signing/mapping, MatchService, DanmakuService, bilibili WBI/XML/provider).
+Run `npm test` for the Main-process unit tests (58 passing: DeviceProfileBuilder, toAss,
+EmbyService, dandanplay signing/mapping, MatchService, DanmakuService, bilibili WBI/XML/provider,
+ProviderRegistry routing).

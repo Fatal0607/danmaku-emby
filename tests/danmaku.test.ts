@@ -10,6 +10,8 @@ import {
 import { DandanplayProvider } from '@/../electron/main/danmaku/providers/dandanplay/DandanplayProvider'
 import { extrapolateEpisodeId, MatchService } from '@/../electron/main/danmaku/MatchService'
 import { DanmakuService } from '@/../electron/main/danmaku/DanmakuService'
+import { ProviderRegistry } from '@/../electron/main/danmaku/ProviderRegistry'
+import type { DanmakuSourceProvider } from '@/../electron/main/danmaku/providers/DanmakuProvider'
 import type { DanmakuMapRepo, DanmakuCacheRepo } from '@/../electron/main/store/repositories/DanmakuRepos'
 import type { DanmakuMapping, DanmakuTrack } from '@shared/types/danmaku'
 
@@ -20,6 +22,11 @@ function fakeFetcher(routes: Array<[RegExp, Partial<FetchLikeResponse>]>): Fetch
       return { status: 200, ok: true, headers: {}, data: {}, ...(hit?.[1] ?? {}) } as FetchLikeResponse
     }),
   }
+}
+
+/** Single-provider registry for orchestration tests. */
+function registryOf(provider: DanmakuSourceProvider): ProviderRegistry {
+  return new ProviderRegistry([{ provider, enabled: true, sortOrder: 0 }])
 }
 
 describe('signRequest', () => {
@@ -166,7 +173,7 @@ describe('MatchService', () => {
       [/\/match/, { data: { isMatched: true, matches: [{ episodeId: 7, animeId: 3, animeTitle: 'A', episodeTitle: '第1话' }] } }],
     ])
     const map = new FakeMapRepo()
-    const svc = new MatchService(new DandanplayProvider(fetcher), map as unknown as DanmakuMapRepo)
+    const svc = new MatchService(registryOf(new DandanplayProvider(fetcher)), map as unknown as DanmakuMapRepo)
     const first = await svc.autoMatch({ embyItemId: 'e1', serverId: 's1', fileName: 'a.mkv' })
     expect(first?.indexedId).toBe('7')
     expect(first?.source).toBe('auto')
@@ -180,11 +187,52 @@ describe('MatchService', () => {
     const fetcher = fakeFetcher([
       [/\/match/, { data: { isMatched: true, matches: [{ episodeId: 999, animeId: 3, animeTitle: 'A', episodeTitle: '第1话' }] } }],
     ])
-    const svc = new MatchService(new DandanplayProvider(fetcher), map as unknown as DanmakuMapRepo)
-    svc.saveManual({ serverId: 's1', embyItemId: 'e1', seasonId: '3', indexedId: '500' })
+    const svc = new MatchService(registryOf(new DandanplayProvider(fetcher)), map as unknown as DanmakuMapRepo)
+    svc.saveManual({ provider: 'dandanplay', serverId: 's1', embyItemId: 'e1', seasonId: '3', indexedId: '500' })
     const result = await svc.autoMatch({ embyItemId: 'e1', serverId: 's1', fileName: 'a.mkv' })
     expect(result?.indexedId).toBe('500')
     expect(result?.source).toBe('manual')
+  })
+})
+
+describe('ProviderRegistry', () => {
+  function stubProvider(id: 'dandanplay' | 'bilibili', matchHit: boolean): DanmakuSourceProvider {
+    return {
+      id,
+      match: vi.fn(async () =>
+        matchHit ? { provider: id, providerIds: { animeId: 1 }, indexedId: '9', title: 't' } : null,
+      ),
+      search: vi.fn(async () => []),
+      episodes: vi.fn(async () => []),
+      getComments: vi.fn(async () => []),
+    }
+  }
+
+  test('get() returns enabled providers by id and skips disabled', () => {
+    const ddp = stubProvider('dandanplay', true)
+    const bili = stubProvider('bilibili', true)
+    const reg = new ProviderRegistry([
+      { provider: ddp, enabled: true, sortOrder: 0 },
+      { provider: bili, enabled: false, sortOrder: 1 },
+    ])
+    expect(reg.get('dandanplay')).toBe(ddp)
+    expect(reg.get('bilibili')).toBeUndefined()
+    expect(reg.enabledByPriority()).toEqual([ddp])
+  })
+
+  test('autoMatch falls through to the next provider in priority order', async () => {
+    const ddp = stubProvider('dandanplay', false) // misses
+    const bili = stubProvider('bilibili', true) // hits
+    const reg = new ProviderRegistry([
+      { provider: ddp, enabled: true, sortOrder: 0 },
+      { provider: bili, enabled: true, sortOrder: 1 },
+    ])
+    const map = new FakeMapRepo()
+    const svc = new MatchService(reg, map as unknown as DanmakuMapRepo)
+    const mapping = await svc.autoMatch({ embyItemId: 'e1', serverId: 's1', fileName: 'a.mkv' })
+    expect(mapping?.provider).toBe('bilibili')
+    expect(ddp.match).toHaveBeenCalledOnce()
+    expect(bili.match).toHaveBeenCalledOnce()
   })
 })
 
@@ -195,7 +243,7 @@ describe('DanmakuService', () => {
     ])
     const cache = new FakeCacheRepo()
     const svc = new DanmakuService(
-      new DandanplayProvider(fetcher),
+      registryOf(new DandanplayProvider(fetcher)),
       new FakeMapRepo() as unknown as DanmakuMapRepo,
       cache as unknown as DanmakuCacheRepo,
     )
@@ -217,7 +265,7 @@ describe('DanmakuService', () => {
     })
     const fetcher = fakeFetcher([[/\/comment\//, { status: 500, ok: false, data: {} }]])
     const svc = new DanmakuService(
-      new DandanplayProvider(fetcher),
+      registryOf(new DandanplayProvider(fetcher)),
       new FakeMapRepo() as unknown as DanmakuMapRepo,
       cache as unknown as DanmakuCacheRepo,
     )
@@ -231,7 +279,7 @@ describe('DanmakuService', () => {
 
   test('toAss renders cached comments to an ASS document', async () => {
     const svc = new DanmakuService(
-      new DandanplayProvider(fakeFetcher([])),
+      registryOf(new DandanplayProvider(fakeFetcher([]))),
       new FakeMapRepo() as unknown as DanmakuMapRepo,
       new FakeCacheRepo() as unknown as DanmakuCacheRepo,
     )

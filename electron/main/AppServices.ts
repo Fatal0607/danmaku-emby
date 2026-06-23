@@ -14,6 +14,7 @@ import type {
   CommentEntity,
   DanmakuEpisode,
   DanmakuMatchInput,
+  DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
 } from '@shared/types/danmaku'
@@ -22,10 +23,12 @@ import { SecretService } from './secret/SecretService'
 import { EmbyService } from './emby/EmbyService'
 import { HttpFetchLike } from './net/FetchLike'
 import { DanmakuService } from './danmaku/DanmakuService'
+import { ProviderRegistry, type ProviderInfo } from './danmaku/ProviderRegistry'
 import {
   DandanplayProvider,
   type DandanplayConfig,
 } from './danmaku/providers/dandanplay/DandanplayProvider'
+import { BilibiliProvider } from './danmaku/providers/bilibili/BilibiliProvider'
 import type { AssOptions } from './danmaku/render/toAss'
 
 // Composition root for the Main process. Builds the Store, SecretService, and
@@ -52,8 +55,12 @@ export class AppServices {
     })
 
     const ddpConfig = this.store.preferences.get<DandanplayConfig>('dandanplayConfig', {})
+    const registry = new ProviderRegistry([
+      { provider: new DandanplayProvider(fetcher, ddpConfig), enabled: true, sortOrder: 0 },
+      { provider: new BilibiliProvider(fetcher), enabled: true, sortOrder: 1 },
+    ])
     this.danmaku = new DanmakuService(
-      new DandanplayProvider(fetcher, ddpConfig),
+      registry,
       this.store.danmakuMap,
       this.store.danmakuCache,
     )
@@ -111,19 +118,24 @@ export class AppServices {
 
   // ---- Danmaku facade ----
 
+  danmakuListProviders(): ProviderInfo[] {
+    return this.danmaku.listProviders()
+  }
+
   danmakuAutoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
     return this.danmaku.autoMatchAndFetch(input)
   }
 
-  danmakuSearch(keyword: string): Promise<DanmakuSeason[]> {
-    return this.danmaku.search(keyword)
+  danmakuSearch(provider: ProviderId, keyword: string): Promise<DanmakuSeason[]> {
+    return this.danmaku.search(provider, keyword)
   }
 
-  danmakuEpisodes(seasonId: string): Promise<DanmakuEpisode[]> {
-    return this.danmaku.episodes(seasonId)
+  danmakuEpisodes(provider: ProviderId, seasonId: string): Promise<DanmakuEpisode[]> {
+    return this.danmaku.episodes(provider, seasonId)
   }
 
   danmakuFetchManual(args: {
+    provider: ProviderId
     serverId: string
     embyItemId: string
     seasonId: string

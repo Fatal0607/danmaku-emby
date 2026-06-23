@@ -1,6 +1,10 @@
 import { ipcMain } from 'electron'
 import { CH, type IpcError, type IpcErrorCode, type IpcResult } from '@shared/types/ipc'
-import type { CommentEntity, DanmakuMatchInput } from '@shared/types/danmaku'
+import type {
+  CommentEntity,
+  DanmakuMatchInput,
+  DanmakuProvider as ProviderId,
+} from '@shared/types/danmaku'
 import type { AppServices } from '../AppServices'
 import { DanmakuError } from '../danmaku/errors'
 import type { AssOptions } from '../danmaku/render/toAss'
@@ -24,12 +28,23 @@ function handle<T>(channel: string, fn: (...args: unknown[]) => Promise<T> | T):
 }
 
 export function registerDanmakuIpc(services: AppServices): void {
+  handle(CH.DM_PROVIDERS, () => services.danmakuListProviders())
   handle(CH.DM_AUTO_MATCH, (input) => services.danmakuAutoMatch(input as DanmakuMatchInput))
-  handle(CH.DM_SEARCH, (keyword) => services.danmakuSearch(keyword as string))
-  handle(CH.DM_EPISODES, (seasonId) => services.danmakuEpisodes(seasonId as string))
+  handle(CH.DM_SEARCH, (provider, keyword) =>
+    services.danmakuSearch(provider as ProviderId, keyword as string),
+  )
+  handle(CH.DM_EPISODES, (provider, seasonId) =>
+    services.danmakuEpisodes(provider as ProviderId, seasonId as string),
+  )
   handle(CH.DM_FETCH, (args) =>
     services.danmakuFetchManual(
-      args as { serverId: string; embyItemId: string; seasonId: string; indexedId: string },
+      args as {
+        provider: ProviderId
+        serverId: string
+        embyItemId: string
+        seasonId: string
+        indexedId: string
+      },
     ),
   )
   handle(CH.DM_TO_ASS, (comments, opts) =>

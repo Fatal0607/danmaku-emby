@@ -16,9 +16,11 @@ import type {
   CommentEntity,
   DanmakuEpisode,
   DanmakuMatchInput,
+  DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
 } from '@shared/types/danmaku'
+import type { ProviderInfo } from '../main/danmaku/ProviderRegistry'
 
 // Whitelisted, typed bridge (docs 06 §6.1). The renderer never sees ipcRenderer
 // directly; only these namespaced methods. Each returns the IpcResult envelope.
@@ -57,13 +59,15 @@ const embyApi = {
 }
 
 const danmakuApi = {
+  listProviders: (): Promise<IpcResult<ProviderInfo[]>> => ipcRenderer.invoke(CH.DM_PROVIDERS),
   autoMatch: (input: DanmakuMatchInput): Promise<IpcResult<DanmakuTrack | null>> =>
     ipcRenderer.invoke(CH.DM_AUTO_MATCH, input),
-  search: (keyword: string): Promise<IpcResult<DanmakuSeason[]>> =>
-    ipcRenderer.invoke(CH.DM_SEARCH, keyword),
-  episodes: (seasonId: string): Promise<IpcResult<DanmakuEpisode[]>> =>
-    ipcRenderer.invoke(CH.DM_EPISODES, seasonId),
+  search: (provider: ProviderId, keyword: string): Promise<IpcResult<DanmakuSeason[]>> =>
+    ipcRenderer.invoke(CH.DM_SEARCH, provider, keyword),
+  episodes: (provider: ProviderId, seasonId: string): Promise<IpcResult<DanmakuEpisode[]>> =>
+    ipcRenderer.invoke(CH.DM_EPISODES, provider, seasonId),
   fetchManual: (args: {
+    provider: ProviderId
     serverId: string
     embyItemId: string
     seasonId: string

@@ -1,14 +1,18 @@
-import type { DanmakuMapping, DanmakuMatchInput } from '@shared/types/danmaku'
+import type {
+  DanmakuMapping,
+  DanmakuMatchInput,
+  DanmakuProvider as ProviderId,
+} from '@shared/types/danmaku'
 import type { DanmakuMapRepo } from '../store/repositories/DanmakuRepos'
-import type { DanmakuSourceProvider } from './providers/DanmakuProvider'
+import type { ProviderRegistry } from './ProviderRegistry'
 
-// Auto-match orchestration (docs 04 §4.6): mapping memory first, then the
-// provider's /match. Manual selections are authoritative and recorded with
-// source='manual' (the repo refuses to let 'auto' overwrite them).
+// Auto-match orchestration (docs 04 §4.6): mapping memory first, then each
+// enabled provider's /match in priority order. Manual selections are
+// authoritative (the repo refuses to let 'auto' overwrite them).
 
 export class MatchService {
   constructor(
-    private readonly provider: DanmakuSourceProvider,
+    private readonly registry: ProviderRegistry,
     private readonly mapRepo: DanmakuMapRepo,
   ) {}
 
@@ -17,24 +21,27 @@ export class MatchService {
     const remembered = this.mapRepo.get(input.serverId, input.embyItemId)
     if (remembered) return remembered
 
-    const episode = await this.provider.match(input)
-    if (!episode) return null
-
-    const mapping: DanmakuMapping = {
-      embyItemId: input.embyItemId,
-      serverId: input.serverId,
-      provider: this.provider.id,
-      seasonId: String(episode.providerIds.animeId ?? ''),
-      indexedId: episode.indexedId,
-      source: 'auto',
-      matchedAt: Date.now(),
+    for (const provider of this.registry.enabledByPriority()) {
+      const episode = await provider.match(input)
+      if (!episode) continue
+      const mapping: DanmakuMapping = {
+        embyItemId: input.embyItemId,
+        serverId: input.serverId,
+        provider: provider.id,
+        seasonId: String(episode.providerIds.animeId ?? episode.providerIds.seasonId ?? ''),
+        indexedId: episode.indexedId,
+        source: 'auto',
+        matchedAt: Date.now(),
+      }
+      this.mapRepo.put(mapping)
+      return mapping
     }
-    this.mapRepo.put(mapping)
-    return mapping
+    return null
   }
 
   /** Persist a user's manual choice (highest priority, overrides auto). */
   saveManual(args: {
+    provider: ProviderId
     serverId: string
     embyItemId: string
     seasonId: string
@@ -43,7 +50,7 @@ export class MatchService {
     const mapping: DanmakuMapping = {
       embyItemId: args.embyItemId,
       serverId: args.serverId,
-      provider: this.provider.id,
+      provider: args.provider,
       seasonId: args.seasonId,
       indexedId: args.indexedId,
       source: 'manual',

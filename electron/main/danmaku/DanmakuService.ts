@@ -2,6 +2,7 @@ import type {
   DanmakuEpisode,
   DanmakuMapping,
   DanmakuMatchInput,
+  DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuTrack,
 } from '@shared/types/danmaku'
@@ -9,24 +10,29 @@ import type { DanmakuCacheRepo, DanmakuMapRepo } from '../store/repositories/Dan
 import { toAss, type AssOptions } from './render/toAss'
 import { DanmakuError } from './errors'
 import { MatchService } from './MatchService'
-import type { DanmakuSourceProvider } from './providers/DanmakuProvider'
+import type { ProviderInfo, ProviderRegistry } from './ProviderRegistry'
 
-const DEFAULT_PROVIDER_CONFIG_ID = 'dandanplay-default'
+const DEFAULT_PROVIDER_CONFIG_ID = 'default'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-// Business orchestration (docs 04 §4.7): cache-first fetch, mapping memory, and
-// {p,m}→ASS rendering. Pulling failures fall back to stale cache so a downloaded
-// track keeps playing (docs 05 §5.5).
+// Business orchestration (docs 04 §4.7) across multiple providers: routes by
+// mapping.provider, cache-first fetch, mapping memory, and {p,m}→ASS rendering.
+// Pulling failures fall back to stale cache so a downloaded track keeps playing
+// (docs 05 §5.5).
 
 export class DanmakuService {
   private readonly match: MatchService
 
   constructor(
-    private readonly provider: DanmakuSourceProvider,
+    private readonly registry: ProviderRegistry,
     mapRepo: DanmakuMapRepo,
     private readonly cacheRepo: DanmakuCacheRepo,
   ) {
-    this.match = new MatchService(provider, mapRepo)
+    this.match = new MatchService(registry, mapRepo)
+  }
+
+  listProviders(): ProviderInfo[] {
+    return this.registry.list()
   }
 
   /** Auto-match an Emby item and return its danmaku, or null if unmatched. */
@@ -42,8 +48,15 @@ export class DanmakuService {
     const fresh = cached && Date.now() - cached.lastChecked < CACHE_TTL_MS
     if (cached && fresh && !forceUpdate) return cached
 
+    const provider = this.registry.get(mapping.provider)
+    if (!provider) {
+      // Provider disabled/removed: keep showing cached danmaku if we have it.
+      if (cached) return cached
+      throw new DanmakuError('DM_PARSE_FAILED', `弹幕源 ${mapping.provider} 未启用`)
+    }
+
     try {
-      const comments = await this.provider.getComments(mapping.indexedId)
+      const comments = await provider.getComments(mapping.indexedId)
       const track: DanmakuTrack = {
         provider: mapping.provider,
         providerConfigId: DEFAULT_PROVIDER_CONFIG_ID,
@@ -56,22 +69,22 @@ export class DanmakuService {
       this.cacheRepo.upsert(track)
       return track
     } catch (e) {
-      // Re-fetch failed: keep playing the cached track if we have one.
       if (cached) return cached
       throw e
     }
   }
 
-  search(keyword: string): Promise<DanmakuSeason[]> {
-    return this.provider.search(keyword)
+  search(provider: ProviderId, keyword: string): Promise<DanmakuSeason[]> {
+    return this.requireProvider(provider).search(keyword)
   }
 
-  episodes(seasonId: string): Promise<DanmakuEpisode[]> {
-    return this.provider.episodes(seasonId)
+  episodes(provider: ProviderId, seasonId: string): Promise<DanmakuEpisode[]> {
+    return this.requireProvider(provider).episodes(seasonId)
   }
 
   /** Record a manual selection and pull its danmaku (manual overrides auto). */
   async fetchManual(args: {
+    provider: ProviderId
     serverId: string
     embyItemId: string
     seasonId: string
@@ -86,5 +99,13 @@ export class DanmakuService {
       throw new DanmakuError('DM_PARSE_FAILED', '弹幕为空')
     }
     return toAss(comments, opts)
+  }
+
+  private requireProvider(id: ProviderId) {
+    const provider = this.registry.get(id)
+    if (!provider) {
+      throw new DanmakuError('DM_PARSE_FAILED', `弹幕源 ${id} 未启用`)
+    }
+    return provider
   }
 }
