@@ -2,9 +2,11 @@ import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { TICKS_PER_SECOND, type PlaybackSource } from '@shared/types/emby'
+import { TICKS_PER_SECOND, type PlaybackSource, type ProgressReport } from '@shared/types/emby'
+import type { PlayerStatePush } from '@shared/types/player'
 import { MpvIpcClient } from '../../electron/main/player/mpv/MpvIpcClient'
 import { MpvEngine } from '../../electron/main/player/MpvEngine'
+import { PlayerController } from '../../electron/main/player/PlayerController'
 import type { PlayerStateEvent } from '../../electron/main/player/PlayerEngine'
 
 // Live mpv control-plane smoke (docs 03 §3.4, Spike A). Requires a real `mpv`
@@ -131,6 +133,43 @@ describe.runIf(enabled)('mpv live control plane (Spike A)', () => {
       engine.dispose()
       await delay(200)
     }
+  }, 30000)
+
+  it('PlayerController: drives mpv, pushes state, reports start/progress/stop', async () => {
+    const reports: ProgressReport[] = []
+    const pushes: PlayerStatePush[] = []
+    const engine = new MpvEngine({ binaryPath: BIN, extraArgs: HEADLESS })
+    const controller = new PlayerController(
+      engine,
+      {
+        resolvePlayback: async () => ({
+          ...source(TEST_SRC),
+          mediaSourceId: 'ms',
+          runTimeTicks: 60 * TICKS_PER_SECOND,
+        }),
+        reportProgress: async (r: ProgressReport) => {
+          reports.push(r)
+        },
+      },
+      { autoMatch: async () => null, toAss: () => '' },
+      { send: (s) => pushes.push(s) },
+      { progressIntervalMs: 500 },
+    )
+    try {
+      await controller.load({ serverId: 'srv', itemId: 'i' })
+      await waitFor(
+        async () => pushes.some((p) => p.timeSec > 0) && reports.some((r) => r.event === 'progress'),
+        (ok) => ok === true,
+        8000,
+      )
+      expect(reports[0]?.event).toBe('start')
+      expect(reports.some((r) => r.event === 'progress')).toBe(true)
+      expect(pushes.some((p) => p.timeSec > 0)).toBe(true)
+      console.info('[mpv] controller reports:', reports.map((r) => r.event).join(','))
+    } finally {
+      await controller.dispose()
+    }
+    expect(reports.some((r) => r.event === 'stop')).toBe(true)
   }, 30000)
 
   it('startTicks maps to mpv start option seconds', () => {

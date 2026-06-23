@@ -22,6 +22,12 @@ import type {
   ProviderConfig,
 } from '@shared/types/danmaku'
 import type { ProviderInfo } from '../main/danmaku/ProviderRegistry'
+import type {
+  PlayerCommand,
+  PlayerLoadRequest,
+  PlayerLoadResult,
+  PlayerStatePush,
+} from '@shared/types/player'
 
 // Whitelisted, typed bridge (docs 06 §6.1). The renderer never sees ipcRenderer
 // directly; only these namespaced methods. Each returns the IpcResult envelope.
@@ -85,10 +91,24 @@ const danmakuApi = {
   ): Promise<IpcResult<string>> => ipcRenderer.invoke(CH.DM_TO_ASS, comments, opts),
 }
 
+const playerApi = {
+  load: (req: PlayerLoadRequest): Promise<IpcResult<PlayerLoadResult>> =>
+    ipcRenderer.invoke(CH.PLAYER_LOAD, req),
+  command: (cmd: PlayerCommand): Promise<IpcResult<void>> =>
+    ipcRenderer.invoke(CH.PLAYER_CMD, cmd),
+  /** Subscribe to pushed playback state; returns an unsubscribe function. */
+  onState: (cb: (state: PlayerStatePush) => void): (() => void) => {
+    const handler = (_e: unknown, state: PlayerStatePush) => cb(state)
+    ipcRenderer.on(CH.PLAYER_STATE, handler)
+    return () => ipcRenderer.removeListener(CH.PLAYER_STATE, handler)
+  },
+}
+
 const api = {
   platform: process.platform,
   emby: embyApi,
   danmaku: danmakuApi,
+  player: playerApi,
 }
 
 export type RendererApi = typeof api
