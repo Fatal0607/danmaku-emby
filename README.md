@@ -14,6 +14,14 @@ npm run build        # typecheck + production bundle
 npm test             # Vitest unit suite (Main-process modules)
 ```
 
+A live platform smoke test (`tests/smoke/`) is skipped unless real credentials are passed via
+env — it never stores them:
+
+```bash
+EMBY_ADDRESS=https://host:8443 EMBY_USERNAME=you EMBY_PASSWORD=*** \
+  npx vitest run tests/smoke/emby.smoke.test.ts
+```
+
 ## What's implemented
 
 The design system + 9 screens from the design comp, all wired through `react-router` (`HashRouter`):
@@ -59,13 +67,20 @@ electron/main/
 ├── player/
 │   ├── PlayerEngine.ts       # engine interface + mpv/html5 capability sets
 │   └── MpvEngine.ts          # libmpv binding site (Spike A — not yet native)
-├── danmaku/render/
-│   ├── parseComment.ts       # {p,m} parsing, BGR color, ASS escaping
-│   └── toAss.ts              # {p,m} → ASS with lane allocation (mpv L1)
+├── danmaku/
+│   ├── DanmakuService.ts     # orchestration: auto-match → cache-first fetch → toAss
+│   ├── MatchService.ts       # /match + mapping memory (manual wins) + episode extrapolation
+│   ├── errors.ts             # DanmakuError codes
+│   ├── providers/
+│   │   ├── DanmakuProvider.ts        # provider interface (dandanplay/B站/腾讯)
+│   │   └── dandanplay/               # provider + signing + raw→internal mapping
+│   └── render/
+│       ├── parseComment.ts   # {p,m} parsing, BGR color, ASS escaping
+│       └── toAss.ts          # {p,m} → ASS with lane allocation (mpv L1)
 ├── store/                    # better-sqlite3 db + migrations + repositories
 │   └── repositories/         # servers, kv (meta/prefs), danmaku map + cache
 ├── secret/SecretService.ts   # safeStorage (Keychain) token storage
-└── ipc/registerEmbyIpc.ts    # IpcResult envelope + error-code mapping
+└── ipc/                      # registerEmbyIpc + registerDanmakuIpc (IpcResult envelope)
 ```
 
 The preload exposes a typed, whitelisted `window.api.emby` bridge; the renderer client
@@ -82,7 +97,12 @@ provide caching, loading, and error states.
 | Emby integration + SQLite + Keychain + secure IPC | ✅ implemented, unit-tested |
 | `toAss` danmaku→ASS converter, DeviceProfileBuilder | ✅ implemented, unit-tested |
 | Renderer wired to live Emby IPC (TanStack Query, mock fallback in browser) | ✅ done |
+| Emby layer verified against a live server (auth → browse → PlaybackInfo direct-play) | ✅ smoke-tested |
+| Danmaku Phase 2: dandanplay provider + MatchService + DanmakuService (cache, manual-wins, toAss) | ✅ implemented, unit-tested |
 | libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
+| dandanplay live (needs AppId signing or self-hosted proxy — official returns 403 unsigned) | ⬜ needs credentials |
+| Danmaku Phase 3: B站 / 腾讯 providers + manifest hot-update | ⬜ later |
 | Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |
 
-Run `npm test` for the 27 Main-process unit tests (DeviceProfileBuilder, toAss, EmbyService).
+Run `npm test` for the Main-process unit tests (43 passing: DeviceProfileBuilder, toAss,
+EmbyService, dandanplay signing/mapping, MatchService, DanmakuService).

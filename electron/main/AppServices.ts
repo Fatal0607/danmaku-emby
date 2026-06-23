@@ -10,10 +10,23 @@ import type {
   ProgressReport,
   ServerInput,
 } from '@shared/types/emby'
+import type {
+  CommentEntity,
+  DanmakuEpisode,
+  DanmakuMatchInput,
+  DanmakuSeason,
+  DanmakuTrack,
+} from '@shared/types/danmaku'
 import { Store } from './store/Store'
 import { SecretService } from './secret/SecretService'
 import { EmbyService } from './emby/EmbyService'
 import { HttpFetchLike } from './net/FetchLike'
+import { DanmakuService } from './danmaku/DanmakuService'
+import {
+  DandanplayProvider,
+  type DandanplayConfig,
+} from './danmaku/providers/dandanplay/DandanplayProvider'
+import type { AssOptions } from './danmaku/render/toAss'
 
 // Composition root for the Main process. Builds the Store, SecretService, and
 // EmbyService, then exposes high-level methods the IPC handlers call. Keeps the
@@ -23,17 +36,27 @@ export class AppServices {
   readonly store: Store
   readonly secrets: SecretService
   readonly emby: EmbyService
+  readonly danmaku: DanmakuService
   readonly deviceId: string
 
   constructor(dbPath: string) {
     this.store = new Store(dbPath)
     this.secrets = new SecretService(this.store.meta)
     this.deviceId = this.store.meta.ensureDeviceId(() => randomUUID())
+
+    const fetcher = new HttpFetchLike()
     this.emby = new EmbyService({
-      fetcher: new HttpFetchLike(),
+      fetcher,
       deviceId: this.deviceId,
       getToken: (serverId) => this.secrets.getToken(serverId),
     })
+
+    const ddpConfig = this.store.preferences.get<DandanplayConfig>('dandanplayConfig', {})
+    this.danmaku = new DanmakuService(
+      new DandanplayProvider(fetcher, ddpConfig),
+      this.store.danmakuMap,
+      this.store.danmakuCache,
+    )
   }
 
   // ---- Emby facade ----
@@ -84,6 +107,33 @@ export class AppServices {
 
   imageUrl(serverId: string, itemId: string, type: ImageType, tag?: string): string {
     return this.emby.imageUrl(this.requireServer(serverId), itemId, type, tag)
+  }
+
+  // ---- Danmaku facade ----
+
+  danmakuAutoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
+    return this.danmaku.autoMatchAndFetch(input)
+  }
+
+  danmakuSearch(keyword: string): Promise<DanmakuSeason[]> {
+    return this.danmaku.search(keyword)
+  }
+
+  danmakuEpisodes(seasonId: string): Promise<DanmakuEpisode[]> {
+    return this.danmaku.episodes(seasonId)
+  }
+
+  danmakuFetchManual(args: {
+    serverId: string
+    embyItemId: string
+    seasonId: string
+    indexedId: string
+  }): Promise<DanmakuTrack> {
+    return this.danmaku.fetchManual(args)
+  }
+
+  danmakuToAss(comments: CommentEntity[], opts: Partial<AssOptions>): string {
+    return this.danmaku.toAss(comments, opts)
   }
 
   private requireServer(serverId: string): EmbyServer {

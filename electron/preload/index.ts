@@ -12,6 +12,13 @@ import type {
   ProgressReport,
   ServerInput,
 } from '@shared/types/emby'
+import type {
+  CommentEntity,
+  DanmakuEpisode,
+  DanmakuMatchInput,
+  DanmakuSeason,
+  DanmakuTrack,
+} from '@shared/types/danmaku'
 
 // Whitelisted, typed bridge (docs 06 §6.1). The renderer never sees ipcRenderer
 // directly; only these namespaced methods. Each returns the IpcResult envelope.
@@ -49,9 +56,29 @@ const embyApi = {
     ipcRenderer.invoke(CH.EMBY_IMAGE_URL, serverId, itemId, type, tag),
 }
 
+const danmakuApi = {
+  autoMatch: (input: DanmakuMatchInput): Promise<IpcResult<DanmakuTrack | null>> =>
+    ipcRenderer.invoke(CH.DM_AUTO_MATCH, input),
+  search: (keyword: string): Promise<IpcResult<DanmakuSeason[]>> =>
+    ipcRenderer.invoke(CH.DM_SEARCH, keyword),
+  episodes: (seasonId: string): Promise<IpcResult<DanmakuEpisode[]>> =>
+    ipcRenderer.invoke(CH.DM_EPISODES, seasonId),
+  fetchManual: (args: {
+    serverId: string
+    embyItemId: string
+    seasonId: string
+    indexedId: string
+  }): Promise<IpcResult<DanmakuTrack>> => ipcRenderer.invoke(CH.DM_FETCH, args),
+  toAss: (
+    comments: CommentEntity[],
+    opts: { width?: number; height?: number; prefs?: unknown },
+  ): Promise<IpcResult<string>> => ipcRenderer.invoke(CH.DM_TO_ASS, comments, opts),
+}
+
 const api = {
   platform: process.platform,
   emby: embyApi,
+  danmaku: danmakuApi,
 }
 
 export type RendererApi = typeof api

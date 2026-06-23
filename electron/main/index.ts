@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { AppServices } from './AppServices'
 import { registerEmbyIpc } from './ipc/registerEmbyIpc'
+import { registerDanmakuIpc } from './ipc/registerDanmakuIpc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -39,6 +40,7 @@ app.whenReady().then(() => {
   const dbPath = join(app.getPath('userData'), 'danmaku-emby.db')
   services = new AppServices(dbPath)
   registerEmbyIpc(services)
+  registerDanmakuIpc(services)
 
   createWindow()
   app.on('activate', () => {
