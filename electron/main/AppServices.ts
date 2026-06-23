@@ -29,6 +29,7 @@ import {
   type DandanplayConfig,
 } from './danmaku/providers/dandanplay/DandanplayProvider'
 import { BilibiliProvider } from './danmaku/providers/bilibili/BilibiliProvider'
+import { TencentProvider } from './danmaku/providers/tencent/TencentProvider'
 import type { AssOptions } from './danmaku/render/toAss'
 
 // Composition root for the Main process. Builds the Store, SecretService, and
@@ -58,6 +59,7 @@ export class AppServices {
     const registry = new ProviderRegistry([
       { provider: new DandanplayProvider(fetcher, ddpConfig), enabled: true, sortOrder: 0 },
       { provider: new BilibiliProvider(fetcher), enabled: true, sortOrder: 1 },
+      { provider: new TencentProvider(fetcher), enabled: true, sortOrder: 2 },
     ])
     this.danmaku = new DanmakuService(
       registry,
