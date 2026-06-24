@@ -10,6 +10,27 @@
   margin-bottom: 36px;
   gap: 20px;
 }
+/* Sticky variant — keeps the back button + title pinned while the page scrolls.
+   Full-bleed frosted bar via negative inline margins matched to .page padding. */
+.page-topbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-inline: -48px;
+  /* Cancel the .page top padding so the frosted bar can pin flush to the very
+     top; the 60px padding-top then keeps the row clear of the 52px window drag
+     strip (.app-titlebar) so the back button stays clickable when pinned. */
+  margin-top: -64px;
+  margin-bottom: 28px;
+  padding: 60px 48px 16px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid var(--hairline);
+}
+.page-topbar-sticky .page-back-button {
+  -webkit-app-region: no-drag;
+}
 .page-eyebrow {
   font-size: var(--text-sm);
   color: var(--text-tertiary);

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { DanmakuMatchInput } from '@shared/types/danmaku'
+import { BackToTop } from '@/components/ui/BackToTop'
 import { Icon } from '@/components/ui/Icon'
 import { Button, Tag } from '@/components/ui/primitives'
 import { ErrorState, PageSpinner } from '@/components/ui/States'
@@ -42,6 +43,13 @@ export function Detail() {
 
   return (
     <div className="detail">
+      {/* Sticky back control — stays pinned top-left while the page scrolls */}
+      <div className="detail-back-slot">
+        <button className="detail-back" onClick={() => navigate(-1)} aria-label="返回">
+          <Icon name="back" size={18} color="var(--text-soft)" />
+        </button>
+      </div>
+
       {/* Backdrop hero */}
       <div
         className="detail-hero"
@@ -49,9 +57,6 @@ export function Detail() {
       >
         {item.posterUrl && <img className="detail-hero-bg" src={item.posterUrl} alt="" />}
         <div className="detail-hero-scrim" />
-        <button className="detail-back" onClick={() => navigate(-1)}>
-          <Icon name="back" size={18} color="var(--text-soft)" />
-        </button>
       </div>
 
       <div className="detail-body">
@@ -196,6 +201,8 @@ export function Detail() {
           defaultQuery={item.title}
         />
       )}
+
+      <BackToTop />
     </div>
   )
 }

@@ -328,7 +328,7 @@ export function Player() {
       </div>
 
       {/* Danmaku overlay */}
-      <DanmakuLayer settings={danmaku} playing={playing} time={time} comments={comments} />
+      <DanmakuLayer settings={danmaku} time={time} comments={comments} />
 
       {/* Top bar */}
       <div className="player-topbar">

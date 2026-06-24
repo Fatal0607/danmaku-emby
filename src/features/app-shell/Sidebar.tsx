@@ -90,21 +90,16 @@ export function Sidebar() {
         </NavLink>
       </nav>
 
-      {/* Footer: user + collapse */}
-      <div className="sidebar-footer">
-        <div className="user-chip">
-          <span className="user-avatar" />
-          {!sidebarCollapsed && (
-            <span className="user-meta">
-              <span className="user-name">{server?.name ? 'cinephile' : '未登录'}</span>
-              <span className="user-role">管理员</span>
-            </span>
-          )}
-        </div>
-        <button className="collapse-btn" onClick={toggleSidebar} title="折叠 / 展开侧栏">
-          <Icon name={sidebarCollapsed ? 'chevron-right' : 'chevron-left'} size={16} />
-        </button>
-      </div>
+      {/* Collapse handle straddling the panel's trailing edge */}
+      <button
+        className="sidebar-edge-toggle"
+        onClick={toggleSidebar}
+        title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+        aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+        aria-pressed={sidebarCollapsed}
+      >
+        <Icon name={sidebarCollapsed ? 'chevron-right' : 'chevron-left'} size={16} />
+      </button>
     </aside>
   )
 }

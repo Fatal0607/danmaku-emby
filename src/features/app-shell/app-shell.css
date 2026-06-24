@@ -209,71 +209,49 @@
   margin: 14px 0 0;
 }
 
-/* footer */
-.sidebar-footer {
-  margin-top: auto;
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-.is-collapsed .sidebar-footer {
-  flex-direction: column;
-  padding: 14px 0 16px;
-}
-.user-chip {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 9px 11px;
-  border-radius: 11px;
-  background: var(--surface-1);
-  min-width: 0;
-}
-.is-collapsed .user-chip {
-  flex: none;
-  padding: 0;
-  background: transparent;
-}
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  flex: none;
+/* Collapse handle — a circular chevron that straddles the sidebar's trailing
+   edge. Sitting on the panel border is the conventional, instantly-readable
+   "collapse this panel" affordance (Notion / Linear style). Fades in fully on
+   hover/focus but stays faintly present so it's discoverable. */
+.sidebar-edge-toggle {
+  position: absolute;
+  top: 78px;
+  right: -13px;
+  z-index: 25;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6a5bff, #3a82f7);
-}
-.user-meta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.user-name {
-  font-size: 12.5px;
-  color: var(--text-strong);
-  font-weight: 600;
-}
-.user-role {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-}
-.collapse-btn {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: 9px;
-  border: none;
-  background: var(--surface-1);
-  color: var(--text-muted);
+  border: 1px solid var(--hairline-strong);
+  background: var(--glass-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  -webkit-app-region: no-drag;
+  opacity: 0.45;
+  transition:
+    opacity var(--dur-normal) var(--ease-out-expo),
+    background var(--dur-fast),
+    color var(--dur-fast),
+    border-color var(--dur-fast),
+    transform var(--dur-fast) var(--ease-out-expo);
 }
-.collapse-btn:hover {
-  background: var(--surface-2);
-  color: var(--text-strong);
+.sidebar:hover .sidebar-edge-toggle,
+.sidebar-edge-toggle:focus-visible {
+  opacity: 1;
+}
+.sidebar-edge-toggle:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: scale(1.08);
+}
+.sidebar-edge-toggle:active {
+  transform: scale(0.92);
 }
 
 /* ---- Content ---- */

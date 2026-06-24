@@ -20,6 +20,7 @@ type IconName =
   | 'star'
   | 'check'
   | 'back'
+  | 'arrow-up'
 
 const PATHS: Record<IconName, JSX.Element> = {
   home: (
@@ -83,6 +84,7 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7" />,
   back: <path d="M11 5l-7 7 7 7M4 12h16" />,
+  'arrow-up': <path d="M12 20V5M5 12l7-7 7 7" />,
 }
 
 export function Icon({

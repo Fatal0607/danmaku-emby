@@ -1,6 +1,7 @@
 import { useLayoutEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { PosterCard } from '@/components/media/PosterCard'
+import { BackToTop } from '@/components/ui/BackToTop'
 import { Icon } from '@/components/ui/Icon'
 import { ErrorState, PosterSkeleton } from '@/components/ui/States'
 import { scrollAppContentToTop } from '@/lib/pageScroll'
@@ -21,7 +22,7 @@ export function ViewAll() {
 
   return (
     <div className="page">
-      <div className="page-topbar">
+      <div className="page-topbar page-topbar-sticky">
         <div className="page-titleline">
           <button className="page-back-button" onClick={() => navigate(-1)} aria-label="返回">
             <Icon name="back" size={18} color="#fff" />
@@ -59,6 +60,8 @@ export function ViewAll() {
           <span>这里暂时没有可展示的内容</span>
         </div>
       )}
+
+      <BackToTop />
     </div>
   )
 }

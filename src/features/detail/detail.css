@@ -17,20 +17,34 @@
   inset: 0;
   background: linear-gradient(180deg, rgba(6, 8, 12, 0.15) 0%, rgba(6, 8, 12, 0.6) 55%, #06080c 100%);
 }
-.detail-back {
-  position: absolute;
+/* Zero-height sticky rail so the back button overlays the hero and stays
+   pinned to the top of the scroll area without taking up layout space.
+   `top` clears the 52px window drag strip (.app-titlebar) so the whole button
+   stays clickable. */
+.detail-back-slot {
+  position: sticky;
   top: 64px;
-  left: 48px;
+  left: 0;
+  z-index: 30;
+  height: 0;
+  padding-left: 48px;
+  pointer-events: none;
+}
+.detail-back {
   width: 40px;
   height: 40px;
   border-radius: 11px;
   border: 1px solid var(--hairline-strong);
   background: rgba(10, 13, 18, 0.55);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 5;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  transition: background var(--dur-fast);
 }
 .detail-back:hover {
   background: var(--surface-2);

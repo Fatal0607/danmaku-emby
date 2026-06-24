@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DanmakuComment } from '@shared/types/domain'
 import type { DanmakuSettings } from '@/lib/store'
-import { danmakuStream } from '@/lib/mockData'
 import './danmaku.css'
 
 interface ActiveComment extends DanmakuComment {
@@ -17,20 +16,18 @@ const LANE_HEIGHT = 38
 const SEEK_THRESHOLD = 2
 
 /**
- * Bilibili-style danmaku overlay. When a real `comments` track is supplied it
- * emits comments time-synced to the playhead (`time`); without one it falls back
- * to the mock stream so the browser preview stays lively. Honors opacity /
- * fontScale / speed / area / density from the danmaku settings. The eventual
- * mpv build renders the ASS track from DanmakuService (docs 04 §4.8) instead.
+ * Bilibili-style danmaku overlay. Emits comments from the supplied `comments`
+ * track time-synced to the playhead (`time`). When no track matched the overlay
+ * stays empty — it never fabricates filler danmaku. Honors opacity / fontScale /
+ * speed / area / density from the danmaku settings. The eventual mpv build
+ * renders the ASS track from DanmakuService (docs 04 §4.8) instead.
  */
 export function DanmakuLayer({
   settings,
-  playing,
   time,
   comments,
 }: {
   settings: DanmakuSettings
-  playing: boolean
   time?: number
   comments?: DanmakuComment[]
 }) {
@@ -93,17 +90,15 @@ export function DanmakuLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time, hasTrack, settings.enabled, settings.density])
 
-  // Mock fallback: emit from the canned stream on an interval (preview only).
-  const mockCursor = useRef(0)
+  // Clear any lingering comments once the track empties (e.g. unmatch) so the
+  // overlay doesn't keep showing stale danmaku with no backing track.
   useEffect(() => {
-    if (hasTrack || !settings.enabled || !playing) return
-    const interval = window.setInterval(() => {
-      if (Math.random() > settings.density) return
-      spawn(danmakuStream[mockCursor.current++ % danmakuStream.length])
-    }, 420)
-    return () => window.clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasTrack, settings.enabled, settings.density, settings.speed, playing])
+    if (!hasTrack) {
+      cursor.current = 0
+      lastTime.current = undefined
+      setActive([])
+    }
+  }, [hasTrack])
 
   if (!settings.enabled) return null
 
