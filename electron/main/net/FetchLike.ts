@@ -64,7 +64,11 @@ export class HttpFetchLike implements FetchLike {
 async function decode<T>(res: Response, type: ResponseType): Promise<T> {
   switch (type) {
     case 'json':
-      return (res.status === 204 ? null : await res.json()) as T
+      if (res.status === 204 || res.status === 205) return null as T
+      {
+        const text = await res.text()
+        return (text.trim() ? JSON.parse(text) : null) as T
+      }
     case 'text':
     case 'xml':
       return (await res.text()) as T

@@ -70,7 +70,7 @@ export class DandanplayProvider implements DanmakuSourceProvider {
       }),
       responseType: 'json',
     })
-    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage)
+    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage, ddpHeader(res.headers, 'x-error-message'))
     if (!res.data.isMatched || !res.data.matches?.length) return null
     return matchToEpisode(res.data.matches[0])
   }
@@ -83,7 +83,7 @@ export class DandanplayProvider implements DanmakuSourceProvider {
       headers: this.headers(path),
       responseType: 'json',
     })
-    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage)
+    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage, ddpHeader(res.headers, 'x-error-message'))
     return (res.data.animes ?? []).map(animeToSeason)
   }
 
@@ -94,7 +94,7 @@ export class DandanplayProvider implements DanmakuSourceProvider {
       headers: this.headers(path),
       responseType: 'json',
     })
-    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage)
+    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage, ddpHeader(res.headers, 'x-error-message'))
     const animeId = res.data.bangumi.animeId
     return (res.data.bangumi.episodes ?? []).map((e) => episodeToEpisode(e, animeId))
   }
@@ -107,7 +107,7 @@ export class DandanplayProvider implements DanmakuSourceProvider {
       headers: this.headers(path),
       responseType: 'json',
     })
-    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage)
+    this.assertOk(res.status, res.data?.errorCode, res.data?.errorMessage, ddpHeader(res.headers, 'x-error-message'))
     return commentsToEntities(res.data.comments ?? [])
   }
 
@@ -122,9 +122,12 @@ export class DandanplayProvider implements DanmakuSourceProvider {
     return base
   }
 
-  private assertOk(status: number, errorCode?: number, errorMessage?: string): void {
+  private assertOk(status: number, errorCode?: number, errorMessage?: string, authError?: string): void {
     if (status === 429) {
       throw new DanmakuError('DM_RATE_LIMITED', '请求过频,稍后重试(已自动节流)')
+    }
+    if (status === 403) {
+      throw new DanmakuError('DM_NOT_LOGGED_IN', `弹弹play 鉴权失败: ${explainAuthError(authError)}`)
     }
     if (status === 401 || errorCode === 401) {
       throw new DanmakuError('DM_NOT_LOGGED_IN', '弹弹play 需要有效的 AppId 签名')
@@ -135,6 +138,31 @@ export class DandanplayProvider implements DanmakuSourceProvider {
     if (status >= 400) {
       throw new DanmakuError('DM_PARSE_FAILED', `弹弹play 请求失败(${status})`)
     }
+  }
+}
+
+function ddpHeader(headers: Record<string, string>, name: string): string | undefined {
+  const lower = name.toLowerCase()
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lower) return value
+  }
+  return undefined
+}
+
+function explainAuthError(reason?: string): string {
+  switch (reason) {
+    case 'Missing Authentication Headers':
+      return '缺少 AppId/AppSecret 或签名请求头(Missing Authentication Headers)'
+    case 'Invalid Timestamp':
+      return '时间戳无效,请校准系统时间(Invalid Timestamp)'
+    case 'Invalid AppId':
+      return 'AppId 无效或应用尚未审核通过(Invalid AppId)'
+    case 'Invalid Signature':
+      return '签名不匹配,请检查 AppSecret(Invalid Signature)'
+    case 'Invalid AppSecret':
+      return 'AppSecret 无效(Invalid AppSecret)'
+    default:
+      return reason || '服务端拒绝请求(403)'
   }
 }
 

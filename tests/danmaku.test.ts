@@ -132,6 +132,25 @@ describe('DandanplayProvider', () => {
     })
   })
 
+  test('maps dandanplay 403 auth headers to a useful error', async () => {
+    const fetcher = fakeFetcher([
+      [
+        /\/search/,
+        {
+          status: 403,
+          ok: false,
+          headers: { 'x-error-message': 'Invalid AppId' },
+          data: null,
+        },
+      ],
+    ])
+
+    await expect(new DandanplayProvider(fetcher).search('海贼王')).rejects.toMatchObject({
+      code: 'DM_NOT_LOGGED_IN',
+      message: expect.stringContaining('Invalid AppId'),
+    })
+  })
+
   test('signs requests when credentials are configured', async () => {
     const fetcher = fakeFetcher([[/\/search/, { data: { animes: [] } }]])
     const provider = new DandanplayProvider(fetcher, { credentials: { appId: 'a', appSecret: 's' } })
