@@ -3,6 +3,9 @@ import type {
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
   DanmakuSeason,
+  DanmakuSeriesMatch,
+  DanmakuSeriesMatchInput,
+  DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
 } from '@shared/types/danmaku'
@@ -23,13 +26,29 @@ export interface ManualFetchArgs {
   indexedId: string
 }
 
+export interface ManualSeriesArgs {
+  provider: ProviderId
+  serverId: string
+  embyItemId: string
+  seasonId: string
+  seasonTitle?: string
+}
+
 export interface DanmakuSource {
   listProviders(): Promise<ProviderInfo[]>
   /** Persisted provider configs (name/enabled/order) for the settings page. */
   listConfigs(): Promise<ProviderConfig[]>
   setProviderEnabled(id: string, enabled: boolean): Promise<ProviderConfig[]>
+  /** Persist a provider's config values (e.g. dandanplay baseUrl/credentials). */
+  setProviderConfig(id: string, configValues: Record<string, unknown>): Promise<ProviderConfig[]>
+  /** Run a connectivity self-check against a provider. */
+  testProvider(id: string): Promise<DanmakuTestResult>
   reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]>
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null>
+  /** Resolve a whole series to a danmaku season + its episode list. */
+  autoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null>
+  /** Persist a manual series→season choice and return its episode list. */
+  saveManualSeries(args: ManualSeriesArgs): Promise<DanmakuSeriesMatch>
   /** Search every enabled provider and merge their seasons. */
   searchAll(keyword: string): Promise<DanmakuSeason[]>
   episodes(provider: ProviderId, seasonId: string): Promise<DanmakuEpisode[]>
@@ -49,12 +68,28 @@ class ElectronDanmakuSource implements DanmakuSource {
     return unwrap(getApi().danmaku.setProviderEnabled(id, enabled))
   }
 
+  setProviderConfig(id: string, configValues: Record<string, unknown>): Promise<ProviderConfig[]> {
+    return unwrap(getApi().danmaku.setProviderConfig(id, configValues))
+  }
+
+  testProvider(id: string): Promise<DanmakuTestResult> {
+    return unwrap(getApi().danmaku.testProvider(id))
+  }
+
   reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]> {
     return unwrap(getApi().danmaku.reorderProviders(orderedIds))
   }
 
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
     return unwrap(getApi().danmaku.autoMatch(input))
+  }
+
+  autoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null> {
+    return unwrap(getApi().danmaku.autoMatchSeries(input))
+  }
+
+  saveManualSeries(args: ManualSeriesArgs): Promise<DanmakuSeriesMatch> {
+    return unwrap(getApi().danmaku.saveManualSeries(args))
   }
 
   async searchAll(keyword: string): Promise<DanmakuSeason[]> {
@@ -155,6 +190,21 @@ class MockDanmakuSource implements DanmakuSource {
     return sortedMockConfigs()
   }
 
+  async setProviderConfig(
+    id: string,
+    configValues: Record<string, unknown>,
+  ): Promise<ProviderConfig[]> {
+    const config = mockConfigs.find((c) => c.id === id)
+    if (config) config.configValues = configValues
+    return sortedMockConfigs()
+  }
+
+  async testProvider(id: string): Promise<DanmakuTestResult> {
+    const config = mockConfigs.find((c) => c.id === id)
+    if (!config?.enabled) return { ok: false, message: '该弹幕源已禁用' }
+    return { ok: true, count: MOCK_SEASONS.length, message: `连接正常,样例命中 ${MOCK_SEASONS.length} 条` }
+  }
+
   async reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]> {
     orderedIds.forEach((id, index) => {
       const config = mockConfigs.find((c) => c.id === id)
@@ -165,6 +215,33 @@ class MockDanmakuSource implements DanmakuSource {
 
   async autoMatch(): Promise<DanmakuTrack | null> {
     return MOCK_TRACK
+  }
+
+  async autoMatchSeries(): Promise<DanmakuSeriesMatch | null> {
+    const enabled = new Set(mockConfigs.filter((c) => c.enabled).map((c) => c.manifestId))
+    // Prefer a multi-episode season so the preview exercises per-episode mapping.
+    const season =
+      MOCK_SEASONS.find((s) => enabled.has(s.provider) && (s.episodeCount ?? 1) > 1) ??
+      MOCK_SEASONS.find((s) => enabled.has(s.provider))
+    if (!season) return null
+    return {
+      provider: season.provider,
+      seasonId: season.indexedId,
+      seasonTitle: season.title,
+      source: 'auto',
+      episodes: await this.episodes(season.provider, season.indexedId),
+    }
+  }
+
+  async saveManualSeries(args: ManualSeriesArgs): Promise<DanmakuSeriesMatch> {
+    const season = MOCK_SEASONS.find((s) => s.indexedId === args.seasonId)
+    return {
+      provider: args.provider,
+      seasonId: args.seasonId,
+      seasonTitle: args.seasonTitle ?? season?.title ?? '',
+      source: 'manual',
+      episodes: await this.episodes(args.provider, args.seasonId),
+    }
   }
 
   async searchAll(keyword: string): Promise<DanmakuSeason[]> {

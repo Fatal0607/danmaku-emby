@@ -1,14 +1,35 @@
 import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { DanmakuMatchInput } from '@shared/types/danmaku'
+import type {
+  DanmakuEpisode,
+  DanmakuMatchInput,
+  DanmakuSeriesMatchInput,
+} from '@shared/types/danmaku'
+import type { DanmakuStatus } from '@shared/types/domain'
 import { BackToTop } from '@/components/ui/BackToTop'
 import { Icon } from '@/components/ui/Icon'
 import { Button, Tag } from '@/components/ui/primitives'
 import { ErrorState, PageSpinner } from '@/components/ui/States'
 import { PROVIDER_LABELS } from '@/lib/danmaku'
-import { useCurrentServerId, useDanmakuTrack, useEpisodes, useMediaItem } from '@/lib/queries'
+import {
+  useCurrentServerId,
+  useDanmakuSeriesMatch,
+  useDanmakuTrack,
+  useEpisodes,
+  useMediaItem,
+} from '@/lib/queries'
 import { DanmakuMatch } from '@/features/player/DanmakuMatch'
 import './detail.css'
+
+/** Index a season's danmaku episodes by episode number (positional fallback). */
+function indexByEpisodeNumber(episodes: DanmakuEpisode[]): Map<number, DanmakuEpisode> {
+  const map = new Map<number, DanmakuEpisode>()
+  episodes.forEach((ep, i) => {
+    const n = ep.episodeNumber ?? i + 1
+    if (!map.has(n)) map.set(n, ep)
+  })
+  return map
+}
 
 export function Detail() {
   const { id = '' } = useParams<{ id: string }>()
@@ -21,8 +42,11 @@ export function Detail() {
   const episodesQuery = useEpisodes(serverId, episodeSeriesId)
   const episodeList = episodesQuery.data ?? []
 
-  const matchInput = useMemo<DanmakuMatchInput | undefined>(() => {
-    if (!serverId || !item) return undefined
+  // A movie is a single video, matched at the file level. A series is matched at
+  // the season level so each episode resolves by its number (docs 04 §4.6) —
+  // matching the series item as one file would pin one arbitrary episode.
+  const movieMatchInput = useMemo<DanmakuMatchInput | undefined>(() => {
+    if (!serverId || !item || isEpisodic) return undefined
     return {
       embyItemId: item.id,
       serverId,
@@ -32,11 +56,45 @@ export function Detail() {
       episode: item.episodeNumber,
       videoDurationSec: item.durationSec,
     }
-  }, [item, serverId])
-  const danmakuQuery = useDanmakuTrack(matchInput)
-  const track = danmakuQuery.data
-  const danmakuStatus = track ? 'matched' : danmakuQuery.isFetching ? 'matching' : item?.danmaku.status
-  const providerLabel = track ? PROVIDER_LABELS[track.provider] : item?.danmaku.provider
+  }, [item, serverId, isEpisodic])
+
+  const seriesMatchInput = useMemo<DanmakuSeriesMatchInput | undefined>(() => {
+    if (!serverId || !item || !isEpisodic || !episodeSeriesId) return undefined
+    return {
+      embyItemId: episodeSeriesId,
+      serverId,
+      seriesTitle: item.originalTitle ?? item.title,
+      season: item.seasonNumber,
+      year: item.year > 0 ? item.year : undefined,
+      episodeCount: episodeList.length || undefined,
+    }
+  }, [item, serverId, isEpisodic, episodeSeriesId, episodeList.length])
+
+  const movieQuery = useDanmakuTrack(movieMatchInput)
+  const seriesQuery = useDanmakuSeriesMatch(seriesMatchInput)
+  const track = movieQuery.data
+  const seriesMatch = seriesQuery.data
+
+  const isMatching = isEpisodic ? seriesQuery.isFetching : movieQuery.isFetching
+  const isMatched = isEpisodic ? !!seriesMatch : !!track
+  const danmakuStatus: DanmakuStatus = isMatched
+    ? 'matched'
+    : isMatching
+      ? 'matching'
+      : item?.danmaku.status ?? 'unmatched'
+  const providerLabel = isEpisodic
+    ? seriesMatch
+      ? PROVIDER_LABELS[seriesMatch.provider]
+      : item?.danmaku.provider
+    : track
+      ? PROVIDER_LABELS[track.provider]
+      : item?.danmaku.provider
+
+  // Map each Emby episode to its danmaku episode by number, for per-row status.
+  const danmakuEpByNumber = useMemo(
+    () => indexByEpisodeNumber(seriesMatch?.episodes ?? []),
+    [seriesMatch],
+  )
 
   if (isLoading) return <PageSpinner label="加载详情…" />
   if (isError || !item) return <ErrorState error={error} onRetry={() => refetch()} />
@@ -93,14 +151,24 @@ export function Detail() {
               <Icon name="danmaku" size={18} color="currentColor" />
             </div>
             <div className="dm-status-text">
-              {danmakuStatus === 'matched' && (
-                <>
-                  <strong>弹幕已匹配</strong>
-                  <span>
-                    {providerLabel} · {(track?.commentCount ?? item.danmaku.count ?? 0).toLocaleString()} 条
-                  </span>
-                </>
-              )}
+              {danmakuStatus === 'matched' &&
+                (isEpisodic && seriesMatch ? (
+                  <>
+                    <strong>整季弹幕已匹配</strong>
+                    <span>
+                      {seriesMatch.seasonTitle ? `${seriesMatch.seasonTitle} · ` : ''}
+                      {providerLabel} · 全 {seriesMatch.episodes.length} 集 · 按集自动套用
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong>弹幕已匹配</strong>
+                    <span>
+                      {providerLabel} ·{' '}
+                      {(track?.commentCount ?? item.danmaku.count ?? 0).toLocaleString()} 条
+                    </span>
+                  </>
+                ))}
               {danmakuStatus === 'matching' && (
                 <>
                   <strong>正在匹配弹幕…</strong>
@@ -110,7 +178,7 @@ export function Detail() {
               {danmakuStatus === 'unmatched' && (
                 <>
                   <strong>尚未匹配弹幕</strong>
-                  <span>手动选择剧集以叠加弹幕</span>
+                  <span>{isEpisodic ? '手动选择整季弹幕来源' : '手动选择剧集以叠加弹幕'}</span>
                 </>
               )}
             </div>
@@ -145,59 +213,70 @@ export function Detail() {
             </span>
           </div>
           <div className="episode-grid">
-            {episodeList.map((ep) => (
-              <button
-                key={ep.id}
-                className="episode-card"
-                onClick={() => navigate(`/player/${ep.id}`)}
-              >
-                <div
-                  className="episode-thumb"
-                  style={{
-                    background: `linear-gradient(150deg, ${ep.poster[0]}, ${ep.poster[1]})`,
-                  }}
+            {episodeList.map((ep) => {
+              // Once the season is matched, each episode resolves by its number;
+              // until then fall back to the catalog's own danmaku hint.
+              const dmEp = danmakuEpByNumber.get(ep.number)
+              const dmStatus: DanmakuStatus = dmEp
+                ? 'matched'
+                : seriesQuery.isFetching
+                  ? 'matching'
+                  : seriesMatch
+                    ? 'unmatched'
+                    : ep.danmaku
+              const dmTitle = dmEp ? `弹幕：${dmEp.title}` : '未匹配'
+              return (
+                <button
+                  key={ep.id}
+                  className="episode-card"
+                  onClick={() => navigate(`/player/${ep.id}`)}
                 >
-                  {ep.watched && (
-                    <span className="episode-watched">
-                      <Icon name="check" size={12} color="#fff" />
-                    </span>
-                  )}
-                  {ep.progress != null && (
-                    <div className="episode-progress">
-                      <div style={{ width: `${ep.progress * 100}%` }} />
-                    </div>
-                  )}
-                  <span className="episode-play">
-                    <Icon name="play" size={16} color="#fff" />
-                  </span>
-                  <span className="episode-duration">{ep.duration}</span>
-                </div>
-                <div className="episode-info">
-                  <span className="episode-num">
-                    {ep.number}. {ep.title}
-                  </span>
-                  <span
-                    className={`episode-dm episode-dm-${ep.danmaku}`}
-                    title={ep.danmakuCount ? `${ep.danmakuCount} 条弹幕` : '未匹配'}
+                  <div
+                    className="episode-thumb"
+                    style={{
+                      background: `linear-gradient(150deg, ${ep.poster[0]}, ${ep.poster[1]})`,
+                    }}
                   >
-                    {ep.danmaku === 'matched'
-                      ? `${(ep.danmakuCount! / 1000).toFixed(1)}k`
-                      : ep.danmaku === 'matching'
-                        ? '匹配中'
-                        : '—'}
-                  </span>
-                </div>
-              </button>
-            ))}
+                    {ep.watched && (
+                      <span className="episode-watched">
+                        <Icon name="check" size={12} color="#fff" />
+                      </span>
+                    )}
+                    {ep.progress != null && (
+                      <div className="episode-progress">
+                        <div style={{ width: `${ep.progress * 100}%` }} />
+                      </div>
+                    )}
+                    <span className="episode-play">
+                      <Icon name="play" size={16} color="#fff" />
+                    </span>
+                    <span className="episode-duration">{ep.duration}</span>
+                  </div>
+                  <div className="episode-info">
+                    <span className="episode-num">
+                      {ep.number}. {ep.title}
+                    </span>
+                    <span className={`episode-dm episode-dm-${dmStatus}`} title={dmTitle}>
+                      {dmStatus === 'matched'
+                        ? '弹幕'
+                        : dmStatus === 'matching'
+                          ? '匹配中'
+                          : '—'}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </section>
       )}
 
       {showMatch && (
         <DanmakuMatch
+          mode={isEpisodic ? 'series' : 'episode'}
           onClose={() => setShowMatch(false)}
           serverId={serverId ?? ''}
-          embyItemId={item.id}
+          embyItemId={isEpisodic ? episodeSeriesId ?? item.id : item.id}
           defaultQuery={item.title}
         />
       )}

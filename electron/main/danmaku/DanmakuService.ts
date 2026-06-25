@@ -4,6 +4,8 @@ import type {
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
   DanmakuSeason,
+  DanmakuSeriesMatch,
+  DanmakuSeriesMatchInput,
   DanmakuTrack,
 } from '@shared/types/danmaku'
 import type { DanmakuCacheRepo, DanmakuMapRepo } from '../store/repositories/DanmakuRepos'
@@ -40,6 +42,36 @@ export class DanmakuService {
     const mapping = await this.match.autoMatch(input)
     if (!mapping) return null
     return this.getDanmaku(mapping)
+  }
+
+  /** Auto-match a whole series to a danmaku season + its episode list. */
+  async autoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null> {
+    const mapping = await this.match.autoMatchSeries(input)
+    if (!mapping) return null
+    return this.buildSeriesMatch(mapping)
+  }
+
+  /** Persist a manual series→season choice and return its episode list. */
+  async saveManualSeries(args: {
+    provider: ProviderId
+    serverId: string
+    embyItemId: string
+    seasonId: string
+    seasonTitle?: string
+  }): Promise<DanmakuSeriesMatch> {
+    const mapping = this.match.saveManualSeries(args)
+    return this.buildSeriesMatch(mapping)
+  }
+
+  private async buildSeriesMatch(mapping: DanmakuMapping): Promise<DanmakuSeriesMatch> {
+    const episodes = await this.episodes(mapping.provider, mapping.seasonId)
+    return {
+      provider: mapping.provider,
+      seasonId: mapping.seasonId,
+      seasonTitle: mapping.seasonTitle ?? '',
+      source: mapping.source,
+      episodes,
+    }
   }
 
   /** Fetch danmaku for a mapping, using cache unless stale or forced. */

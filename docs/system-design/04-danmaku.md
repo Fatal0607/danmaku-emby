@@ -133,7 +133,9 @@ interface FetchLikeRequest {
 
 ## 4.6 匹配编排(体验核心)
 
-### 自动匹配:dandanplay `/api/v2/match`
+匹配分两个层级:**单集级**(电影 / 正在播放的某一集)走 dandanplay `/match`;**整季级**(剧集详情页)先把整部剧匹配到一个 season,再让每一集按集号在该 season 内解析。详情页若把"整部剧"当成单个文件去 `/match`,只会钉到某一集弹幕——这是要避免的反例。
+
+### 单集自动匹配:dandanplay `/api/v2/match`
 利用 Emby 给的干净元数据:
 
 ```ts
@@ -143,6 +145,7 @@ interface DanmakuMatchInput {
   fileSize?: number
   videoDurationSec?: number
   seriesTitle?: string      // 剧名
+  seriesEmbyItemId?: string // 所属剧集 id;命中整季映射时按集号解析
   season?: number
   episode?: number          // 集号
 }
@@ -150,15 +153,35 @@ interface DanmakuMatchInput {
 
 链路:
 1. 查 **映射记忆**(`danmaku_map`:`embyItemId → {provider, episodeId}`)→ 命中直接用。
-2. 否则 `POST /api/v2/match` 传文件名(+大小/时长)→ 高命中返回 `episodeId`。
-3. 命中 → 走 danmaku 拉取 → 写映射记忆 + 缓存。
-4. 未命中 → 返回 `null`,UI 提示并入口手动匹配。
+2. 若 `seriesEmbyItemId` 命中一条 **整季映射**(见下),按 `episode` 集号在该 season 内解析出 `episodeId` → 写单集映射并返回(优先于 `/match`)。
+3. 否则 `POST /api/v2/match` 传文件名(+大小/时长)→ 高命中返回 `episodeId`。
+4. 命中 → 走 danmaku 拉取 → 写映射记忆 + 缓存。
+5. 未命中 → 返回 `null`,UI 提示并入口手动匹配。
 
-### 按集号外推
-同一剧集已匹配某集后,后续集按 `episodeNumber` 偏移推算 `episodeId`(弹弹play 同番剧 episodeId 连续),减少逐集匹配。命中后仍校验标题。
+### 整季自动匹配(剧集详情页)
+剧集详情页用剧名搜索各启用 provider,挑最契合的 season(标题重合度 + 集数/年份微调,多集剧不会误钉到剧场版/电影单集),记成一条 **整季映射**:复用 `danmaku_map`,`indexedId = ''` 表示"只钉 season、不指定集",并存 `seasonTitle` 供 UI 直接显示。
+
+```ts
+interface DanmakuSeriesMatchInput {
+  embyItemId: string        // 剧集(整部剧)id
+  serverId: string
+  seriesTitle: string
+  season?: number
+  year?: number
+  episodeCount?: number     // 集数提示,辅助挑季
+}
+```
+
+每集解析优先按 `episodeNumber` 命中,缺失则按 season 内位置(1-based)回退。一部剧只需一次整季匹配,后续每集(详情页展示、播放时拉取)都复用它,避免逐集打 `/match`。
+
+### 按集号外推(备选)
+`extrapolateEpisodeId()` 保留:弹弹play 同番剧 episodeId 连续,可由已知集 id 偏移推算邻集。现以"整季 season 的 episode 列表 + 集号"为主,外推为兜底。命中后仍校验标题。
 
 ### 手动匹配 UI 流程
-`search(keyword)` → 选 Season → `episodes(seasonIds)` → 选 Episode → `fetch` → 写映射记忆(用户选择优先级最高,覆盖自动结果)。
+- **单集**(电影/播放器):`search(keyword)` → 选 Season → `episodes(seasonId)` → 选 Episode → `fetchManual` → 写单集映射。
+- **整季**(剧集详情页):`search(keyword)` → 选 Season → `saveManualSeries` → 写整季映射,后续剧集自动按集号套用。
+
+用户手动选择优先级最高,覆盖自动结果(整季手动钉后,其解析出的单集映射也视为 `manual`)。
 
 ## 4.7 拉取与缓存(方案文档第 10 节)
 
@@ -180,6 +203,22 @@ interface DanmakuMatchInput {
 - 输出整段 ASS 文本 → `PlayerEngine.loadAssOverlay(assText)`。
 
 > Canvas 渲染(html5 / mpv L2·L3)走另一条:`comments` 直接喂渲染引擎,按 `time-pos` 推进。
+
+## 4.10 Provider 配置(设置页)
+
+每个 provider 的可调参数存在 `provider_configs.config_values`(JSON),设置页可改、即时生效(更新后重配活动 provider 实例,无需重启):
+
+| provider | configValues 字段 | 说明 |
+|---|---|---|
+| 弹弹play | `baseUrl` | 代理/官方地址。留空=官方 `https://api.dandanplay.net`(需签名) |
+|  | `appId` / `appSecret` | 官方 API 签名凭据。**仅自托管/本机填写**;走代理代签时留空 |
+|  | `chConvert` | 简繁转换:0 不转 / 1 简体 / 2 繁体 |
+| B 站 | `danmakuFormat` | `xml` / `protobuf` |
+| 腾讯 | —（依赖 Cookie 登录) | |
+
+> **弹弹play 常见"用不了"**:官方 API 对所有接口要求 `X-AppId`/`X-Signature` 签名。既没填 `appId`/`appSecret`、又没配代理 `baseUrl` 时,请求返回 401 → `DM_NOT_LOGGED_IN`。设置页填入凭据或代理地址即可。`appSecret` 属用户自有密钥,仅落本机 SQLite;分发版应优先走代理代签(见 06)。
+
+`danmakuSetProviderConfig(id, configValues)` 持久化并重配实例;`danmakuTestProvider(id)` 跑一次样例搜索做连通性自检。
 
 ## 4.9 弹幕错误码
 

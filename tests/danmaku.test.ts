@@ -7,13 +7,26 @@ import {
   matchToEpisode,
   parseEpisodeNumber,
 } from '@/../electron/main/danmaku/providers/dandanplay/mapping'
-import { DandanplayProvider } from '@/../electron/main/danmaku/providers/dandanplay/DandanplayProvider'
-import { extrapolateEpisodeId, MatchService } from '@/../electron/main/danmaku/MatchService'
+import {
+  DandanplayProvider,
+  toDandanplayConfig,
+} from '@/../electron/main/danmaku/providers/dandanplay/DandanplayProvider'
+import {
+  extrapolateEpisodeId,
+  MatchService,
+  pickBestSeason,
+  pickEpisodeByNumber,
+} from '@/../electron/main/danmaku/MatchService'
 import { DanmakuService } from '@/../electron/main/danmaku/DanmakuService'
 import { ProviderRegistry } from '@/../electron/main/danmaku/ProviderRegistry'
 import type { DanmakuSourceProvider } from '@/../electron/main/danmaku/providers/DanmakuProvider'
 import type { DanmakuMapRepo, DanmakuCacheRepo } from '@/../electron/main/store/repositories/DanmakuRepos'
-import type { DanmakuMapping, DanmakuTrack } from '@shared/types/danmaku'
+import type {
+  DanmakuEpisode,
+  DanmakuMapping,
+  DanmakuSeason,
+  DanmakuTrack,
+} from '@shared/types/danmaku'
 
 function fakeFetcher(routes: Array<[RegExp, Partial<FetchLikeResponse>]>): FetchLike {
   return {
@@ -129,6 +142,25 @@ describe('DandanplayProvider', () => {
   })
 })
 
+describe('toDandanplayConfig', () => {
+  test('builds signing credentials only when both id and secret are present', () => {
+    expect(toDandanplayConfig({ appId: 'a', appSecret: 's' }).credentials).toEqual({
+      appId: 'a',
+      appSecret: 's',
+    })
+    expect(toDandanplayConfig({ appId: 'a' }).credentials).toBeUndefined()
+    expect(toDandanplayConfig({}).credentials).toBeUndefined()
+  })
+
+  test('normalizes baseUrl and chConvert', () => {
+    const cfg = toDandanplayConfig({ baseUrl: '  https://p/ddp  ', chConvert: 2 })
+    expect(cfg.baseUrl).toBe('https://p/ddp')
+    expect(cfg.chConvert).toBe(2)
+    expect(toDandanplayConfig({ baseUrl: '   ' }).baseUrl).toBeUndefined()
+    expect(toDandanplayConfig({ chConvert: 9 }).chConvert).toBe(0)
+  })
+})
+
 describe('extrapolateEpisodeId', () => {
   test('offsets the base id by the episode-number delta', () => {
     expect(extrapolateEpisodeId(1000, 1, 5)).toBe(1004)
@@ -192,6 +224,149 @@ describe('MatchService', () => {
     const result = await svc.autoMatch({ embyItemId: 'e1', serverId: 's1', fileName: 'a.mkv' })
     expect(result?.indexedId).toBe('500')
     expect(result?.source).toBe('manual')
+  })
+})
+
+function season(partial: Partial<DanmakuSeason>): DanmakuSeason {
+  return {
+    provider: 'dandanplay',
+    providerIds: {},
+    indexedId: 's',
+    title: '',
+    ...partial,
+  }
+}
+
+describe('pickBestSeason', () => {
+  test('prefers an exact title match', () => {
+    const seasons = [
+      season({ indexedId: 'a', title: '别的番' }),
+      season({ indexedId: 'b', title: '星海彼端' }),
+    ]
+    const best = pickBestSeason(seasons, {
+      embyItemId: 's1',
+      serverId: 'srv',
+      seriesTitle: '星海彼端',
+    })
+    expect(best?.indexedId).toBe('b')
+  })
+
+  test('avoids a single-video season for a multi-episode series', () => {
+    const seasons = [
+      season({ indexedId: 'movie', title: '星海彼端 剧场版', episodeCount: 1 }),
+      season({ indexedId: 'tv', title: '星海彼端', episodeCount: 12 }),
+    ]
+    const best = pickBestSeason(seasons, {
+      embyItemId: 's1',
+      serverId: 'srv',
+      seriesTitle: '星海彼端',
+      episodeCount: 12,
+    })
+    expect(best?.indexedId).toBe('tv')
+  })
+
+  test('returns null when nothing shares the title', () => {
+    const seasons = [season({ title: '完全无关' })]
+    expect(
+      pickBestSeason(seasons, { embyItemId: 's1', serverId: 'srv', seriesTitle: '星海彼端' }),
+    ).toBeNull()
+  })
+})
+
+describe('pickEpisodeByNumber', () => {
+  const eps: DanmakuEpisode[] = [
+    { provider: 'dandanplay', providerIds: {}, indexedId: '101', title: '第1话', episodeNumber: 1 },
+    { provider: 'dandanplay', providerIds: {}, indexedId: '103', title: '第3话', episodeNumber: 3 },
+  ]
+
+  test('matches by declared episode number', () => {
+    expect(pickEpisodeByNumber(eps, 3)?.indexedId).toBe('103')
+  })
+
+  test('falls back to positional order when no number matches', () => {
+    const noNumbers: DanmakuEpisode[] = eps.map((e) => ({ ...e, episodeNumber: undefined }))
+    expect(pickEpisodeByNumber(noNumbers, 2)?.indexedId).toBe('103')
+  })
+
+  test('returns null when out of range', () => {
+    expect(pickEpisodeByNumber(eps, 9)).toBeNull()
+  })
+})
+
+describe('MatchService series matching', () => {
+  function seasonProvider(): DanmakuSourceProvider {
+    return {
+      id: 'dandanplay',
+      match: vi.fn(async () => null),
+      search: vi.fn(async () => [
+        season({ indexedId: 'movie', title: '星海彼端 剧场版', episodeCount: 1 }),
+        season({ indexedId: 'tv', title: '星海彼端', episodeCount: 12 }),
+      ]),
+      episodes: vi.fn(async (seasonId: string) =>
+        seasonId === 'tv'
+          ? [
+              { provider: 'dandanplay', providerIds: {}, indexedId: '201', title: '第1话', episodeNumber: 1 },
+              { provider: 'dandanplay', providerIds: {}, indexedId: '202', title: '第2话', episodeNumber: 2 },
+            ]
+          : [],
+      ),
+      getComments: vi.fn(async () => []),
+    }
+  }
+
+  test('autoMatchSeries pins the best season as a series row', async () => {
+    const map = new FakeMapRepo()
+    const svc = new MatchService(registryOf(seasonProvider()), map as unknown as DanmakuMapRepo)
+    const mapping = await svc.autoMatchSeries({
+      embyItemId: 'series1',
+      serverId: 's1',
+      seriesTitle: '星海彼端',
+      episodeCount: 12,
+    })
+    expect(mapping?.seasonId).toBe('tv')
+    expect(mapping?.indexedId).toBe('') // series-level row
+    expect(mapping?.seasonTitle).toBe('星海彼端')
+  })
+
+  test('autoMatch resolves an episode from a pinned series by number', async () => {
+    const map = new FakeMapRepo()
+    const svc = new MatchService(registryOf(seasonProvider()), map as unknown as DanmakuMapRepo)
+    await svc.autoMatchSeries({
+      embyItemId: 'series1',
+      serverId: 's1',
+      seriesTitle: '星海彼端',
+      episodeCount: 12,
+    })
+    const ep = await svc.autoMatch({
+      embyItemId: 'ep2',
+      serverId: 's1',
+      fileName: 'whatever.mkv',
+      seriesEmbyItemId: 'series1',
+      episode: 2,
+    })
+    expect(ep?.indexedId).toBe('202')
+    expect(ep?.seasonId).toBe('tv')
+  })
+
+  test('a manual series pin makes its resolved episodes authoritative', async () => {
+    const map = new FakeMapRepo()
+    const svc = new MatchService(registryOf(seasonProvider()), map as unknown as DanmakuMapRepo)
+    svc.saveManualSeries({
+      provider: 'dandanplay',
+      serverId: 's1',
+      embyItemId: 'series1',
+      seasonId: 'tv',
+      seasonTitle: '星海彼端',
+    })
+    const ep = await svc.autoMatch({
+      embyItemId: 'ep1',
+      serverId: 's1',
+      fileName: 'whatever.mkv',
+      seriesEmbyItemId: 'series1',
+      episode: 1,
+    })
+    expect(ep?.source).toBe('manual')
+    expect(ep?.indexedId).toBe('201')
   })
 })
 

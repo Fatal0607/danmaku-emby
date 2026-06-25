@@ -16,6 +16,9 @@ import type {
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
   DanmakuSeason,
+  DanmakuSeriesMatch,
+  DanmakuSeriesMatchInput,
+  DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
 } from '@shared/types/danmaku'
@@ -24,6 +27,7 @@ import { SecretService } from './secret/SecretService'
 import { EmbyService } from './emby/EmbyService'
 import { HttpFetchLike } from './net/FetchLike'
 import { DanmakuService } from './danmaku/DanmakuService'
+import { DanmakuError } from './danmaku/errors'
 import {
   ProviderRegistry,
   type ProviderInfo,
@@ -31,7 +35,7 @@ import {
 } from './danmaku/ProviderRegistry'
 import {
   DandanplayProvider,
-  type DandanplayConfig,
+  toDandanplayConfig,
 } from './danmaku/providers/dandanplay/DandanplayProvider'
 import { BilibiliProvider } from './danmaku/providers/bilibili/BilibiliProvider'
 import { TencentProvider } from './danmaku/providers/tencent/TencentProvider'
@@ -50,6 +54,9 @@ export class AppServices {
   readonly danmaku: DanmakuService
   readonly deviceId: string
   private readonly registry: ProviderRegistry
+  /** Live provider instances, keyed by manifest, for runtime reconfiguration. */
+  private readonly providerByManifest: Partial<Record<ProviderId, DanmakuSourceProvider>>
+  private readonly dandanplay: DandanplayProvider
 
   constructor(dbPath: string) {
     this.store = new Store(dbPath)
@@ -65,18 +72,19 @@ export class AppServices {
 
     // Provider instances keyed by manifest; the registry's enabled/order come
     // from persisted provider_configs (seeded with the built-ins on first run).
-    const ddpConfig = this.store.preferences.get<DandanplayConfig>('dandanplayConfig', {})
-    const providerByManifest: Partial<Record<ProviderId, DanmakuSourceProvider>> = {
-      dandanplay: new DandanplayProvider(fetcher, ddpConfig),
+    this.store.providerConfigs.seedDefaults(DEFAULT_PROVIDER_CONFIGS)
+    const ddpValues = this.store.providerConfigs.get('dandanplay')?.configValues ?? {}
+    this.dandanplay = new DandanplayProvider(fetcher, toDandanplayConfig(ddpValues))
+    this.providerByManifest = {
+      dandanplay: this.dandanplay,
       bilibili: new BilibiliProvider(fetcher),
       tencent: new TencentProvider(fetcher),
     }
 
-    this.store.providerConfigs.seedDefaults(DEFAULT_PROVIDER_CONFIGS)
     const entries = this.store.providerConfigs
       .list()
       .map((c): RegisteredProvider | null => {
-        const provider = providerByManifest[c.manifestId]
+        const provider = this.providerByManifest[c.manifestId]
         return provider ? { provider, enabled: c.enabled, sortOrder: c.sortOrder } : null
       })
       .filter((e): e is RegisteredProvider => e !== null)
@@ -166,8 +174,44 @@ export class AppServices {
     return this.store.providerConfigs.list()
   }
 
+  /** Persist a provider's config values and reconfigure its live instance. */
+  danmakuSetProviderConfig(id: string, configValues: Record<string, unknown>): ProviderConfig[] {
+    const existing = this.store.providerConfigs.get(id)
+    if (!existing) throw new DanmakuError('DM_PARSE_FAILED', `未知弹幕源 ${id}`)
+    this.store.providerConfigs.upsert({ ...existing, configValues })
+    if (id === 'dandanplay') {
+      this.dandanplay.configure(toDandanplayConfig(configValues))
+    }
+    return this.store.providerConfigs.list()
+  }
+
+  /** Connectivity self-check: run a sample search and report success/failure. */
+  async danmakuTestProvider(id: string, keyword = '海贼王'): Promise<DanmakuTestResult> {
+    try {
+      const seasons = await this.danmaku.search(id as ProviderId, keyword)
+      return { ok: true, count: seasons.length, message: `连接正常,样例命中 ${seasons.length} 条` }
+    } catch (e) {
+      const message = e instanceof DanmakuError ? e.message : e instanceof Error ? e.message : String(e)
+      return { ok: false, message }
+    }
+  }
+
   danmakuAutoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
     return this.danmaku.autoMatchAndFetch(input)
+  }
+
+  danmakuAutoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null> {
+    return this.danmaku.autoMatchSeries(input)
+  }
+
+  danmakuSaveManualSeries(args: {
+    provider: ProviderId
+    serverId: string
+    embyItemId: string
+    seasonId: string
+    seasonTitle?: string
+  }): Promise<DanmakuSeriesMatch> {
+    return this.danmaku.saveManualSeries(args)
   }
 
   danmakuSearch(provider: ProviderId, keyword: string): Promise<DanmakuSeason[]> {

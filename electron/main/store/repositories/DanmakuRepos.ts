@@ -13,6 +13,7 @@ interface MapRow {
   server_id: string
   provider: string
   season_id: string
+  season_title: string
   indexed_id: string
   source: string
   matched_at: number
@@ -23,6 +24,7 @@ const toMapping = (r: MapRow): DanmakuMapping => ({
   serverId: r.server_id,
   provider: r.provider as DanmakuProvider,
   seasonId: r.season_id,
+  seasonTitle: r.season_title || undefined,
   indexedId: r.indexed_id,
   source: r.source === 'manual' ? 'manual' : 'auto',
   matchedAt: r.matched_at,
@@ -58,13 +60,17 @@ export class DanmakuMapRepo {
     this.db
       .prepare(
         `INSERT INTO danmaku_map
-           (emby_item_id, server_id, provider, season_id, indexed_id, source, matched_at)
-         VALUES (@embyItemId, @serverId, @provider, @seasonId, @indexedId, @source, @matchedAt)
+           (emby_item_id, server_id, provider, season_id, season_title, indexed_id, source, matched_at)
+         VALUES (@embyItemId, @serverId, @provider, @seasonId, @seasonTitle, @indexedId, @source, @matchedAt)
          ON CONFLICT(emby_item_id, server_id) DO UPDATE SET
-           provider = @provider, season_id = @seasonId, indexed_id = @indexedId,
-           source = @source, matched_at = @matchedAt`,
+           provider = @provider, season_id = @seasonId, season_title = @seasonTitle,
+           indexed_id = @indexedId, source = @source, matched_at = @matchedAt`,
       )
-      .run({ ...m, matchedAt: m.matchedAt || Date.now() })
+      .run({
+        ...m,
+        seasonTitle: m.seasonTitle ?? '',
+        matchedAt: m.matchedAt || Date.now(),
+      })
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   CommentEntity,
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
+  DanmakuSeriesMatchInput,
 } from '@shared/types/danmaku'
 import type { AppServices } from '../AppServices'
 import { DanmakuError } from '../danmaku/errors'
@@ -33,10 +34,28 @@ export function registerDanmakuIpc(services: AppServices): void {
   handle(CH.DM_SET_ENABLED, (id, enabled) =>
     services.danmakuSetProviderEnabled(id as string, enabled as boolean),
   )
+  handle(CH.DM_SET_CONFIG, (id, configValues) =>
+    services.danmakuSetProviderConfig(id as string, configValues as Record<string, unknown>),
+  )
+  handle(CH.DM_TEST, (id) => services.danmakuTestProvider(id as string))
   handle(CH.DM_REORDER, (orderedIds) =>
     services.danmakuReorderProviders(orderedIds as string[]),
   )
   handle(CH.DM_AUTO_MATCH, (input) => services.danmakuAutoMatch(input as DanmakuMatchInput))
+  handle(CH.DM_AUTO_MATCH_SERIES, (input) =>
+    services.danmakuAutoMatchSeries(input as DanmakuSeriesMatchInput),
+  )
+  handle(CH.DM_SAVE_MANUAL_SERIES, (args) =>
+    services.danmakuSaveManualSeries(
+      args as {
+        provider: ProviderId
+        serverId: string
+        embyItemId: string
+        seasonId: string
+        seasonTitle?: string
+      },
+    ),
+  )
   handle(CH.DM_SEARCH, (provider, keyword) =>
     services.danmakuSearch(provider as ProviderId, keyword as string),
   )

@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import type { DanmakuProvider } from '@shared/types/danmaku'
+import type { DanmakuProvider, DanmakuTestResult, ProviderConfig } from '@shared/types/danmaku'
 import { Icon } from '@/components/ui/Icon'
-import { Toggle, Segmented, Slider, Tag } from '@/components/ui/primitives'
+import { Button, Toggle, Segmented, Slider, Tag } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { servers } from '@/lib/mockData'
 import {
   useDanmakuConfigs,
   useReorderProviders,
+  useSetProviderConfig,
   useSetProviderEnabled,
+  useTestProvider,
 } from '@/lib/queries'
 import '@/styles/page.css'
 import './settings.css'
@@ -178,11 +180,12 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   )
 }
 
-/** Danmaku source list — persisted enable/priority backed by provider_configs. */
+/** Danmaku source list — persisted enable/priority/config backed by provider_configs. */
 function ProviderSources() {
   const { data: configs = [] } = useDanmakuConfigs()
   const setEnabled = useSetProviderEnabled()
   const reorder = useReorderProviders()
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir
@@ -193,41 +196,188 @@ function ProviderSources() {
   }
 
   return (
-    <Group title="弹幕来源" hint="自动匹配的优先顺序,可开关与排序">
-      {configs.map((config, index) => (
-        <div key={config.id} className="settings-row">
-          <div className="settings-row-meta">
-            <span className="settings-row-icon settings-source-rank">{index + 1}</span>
-            <div>
-              <div className="settings-row-label">{config.name}</div>
-              <div className="settings-row-hint">{PROVIDER_HINTS[config.manifestId]}</div>
+    <Group title="弹幕来源" hint="自动匹配的优先顺序,可开关、排序与配置">
+      {configs.map((config, index) => {
+        const open = expanded === config.id
+        return (
+          <div key={config.id} className="settings-source">
+            <div className="settings-row">
+              <div className="settings-row-meta">
+                <span className="settings-row-icon settings-source-rank">{index + 1}</span>
+                <div>
+                  <div className="settings-row-label">{config.name}</div>
+                  <div className="settings-row-hint">{PROVIDER_HINTS[config.manifestId]}</div>
+                </div>
+              </div>
+              <div className="settings-row-control settings-source-actions">
+                <button
+                  className="settings-source-move"
+                  onClick={() => move(index, -1)}
+                  disabled={index === 0 || reorder.isPending}
+                  aria-label="上移"
+                >
+                  <Icon name="chevron-down" size={15} color="var(--text-muted)" style={{ transform: 'rotate(180deg)' }} />
+                </button>
+                <button
+                  className="settings-source-move"
+                  onClick={() => move(index, 1)}
+                  disabled={index === configs.length - 1 || reorder.isPending}
+                  aria-label="下移"
+                >
+                  <Icon name="chevron-down" size={15} color="var(--text-muted)" />
+                </button>
+                <button
+                  className={`settings-source-move${open ? ' is-active' : ''}`}
+                  onClick={() => setExpanded(open ? null : config.id)}
+                  aria-label="配置"
+                  aria-expanded={open}
+                >
+                  <Icon name="settings" size={15} color="var(--text-muted)" />
+                </button>
+                <Toggle
+                  checked={config.enabled}
+                  onChange={(v) => setEnabled.mutate({ id: config.id, enabled: v })}
+                  label={`${config.name} 开关`}
+                />
+              </div>
             </div>
+            {open && <ProviderConfigDrawer config={config} />}
           </div>
-          <div className="settings-row-control settings-source-actions">
-            <button
-              className="settings-source-move"
-              onClick={() => move(index, -1)}
-              disabled={index === 0 || reorder.isPending}
-              aria-label="上移"
-            >
-              <Icon name="chevron-down" size={15} color="var(--text-muted)" style={{ transform: 'rotate(180deg)' }} />
-            </button>
-            <button
-              className="settings-source-move"
-              onClick={() => move(index, 1)}
-              disabled={index === configs.length - 1 || reorder.isPending}
-              aria-label="下移"
-            >
-              <Icon name="chevron-down" size={15} color="var(--text-muted)" />
-            </button>
-            <Toggle
-              checked={config.enabled}
-              onChange={(v) => setEnabled.mutate({ id: config.id, enabled: v })}
-              label={`${config.name} 开关`}
-            />
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </Group>
+  )
+}
+
+/** Per-provider configuration + connectivity test. */
+function ProviderConfigDrawer({ config }: { config: ProviderConfig }) {
+  const test = useTestProvider()
+  return (
+    <div className="settings-source-drawer">
+      {config.manifestId === 'dandanplay' ? (
+        <DandanplayFields config={config} />
+      ) : (
+        <p className="settings-drawer-note">
+          {config.manifestId === 'bilibili'
+            ? 'B 站弹幕需要登录获取 Cookie,登录窗口将在后续版本接入。'
+            : '腾讯视频依赖站点 Cookie,部分内容受地区/会员限制。'}
+        </p>
+      )}
+      <div className="settings-drawer-actions">
+        <Button
+          variant="secondary"
+          onClick={() => test.mutate(config.id)}
+          disabled={test.isPending}
+        >
+          {test.isPending ? '测试中…' : '测试连接'}
+        </Button>
+        <TestResultBadge result={test.data} error={test.error} />
+      </div>
+    </div>
+  )
+}
+
+function TestResultBadge({ result, error }: { result?: DanmakuTestResult; error: unknown }) {
+  if (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return <span className="settings-test-result is-fail">✕ {message}</span>
+  }
+  if (!result) return null
+  return (
+    <span className={`settings-test-result ${result.ok ? 'is-ok' : 'is-fail'}`}>
+      {result.ok ? '✓ ' : '✕ '}
+      {result.message}
+    </span>
+  )
+}
+
+/** dandanplay needs a signing proxy (baseUrl) or AppId/AppSecret credentials. */
+function DandanplayFields({ config }: { config: ProviderConfig }) {
+  const save = useSetProviderConfig()
+  const cv = config.configValues
+  const [baseUrl, setBaseUrl] = useState(typeof cv.baseUrl === 'string' ? cv.baseUrl : '')
+  const [appId, setAppId] = useState(typeof cv.appId === 'string' ? cv.appId : '')
+  const [appSecret, setAppSecret] = useState(typeof cv.appSecret === 'string' ? cv.appSecret : '')
+  const [chConvert, setChConvert] = useState<'0' | '1' | '2'>(
+    (['0', '1', '2'] as const).includes(String(cv.chConvert) as '0' | '1' | '2')
+      ? (String(cv.chConvert) as '0' | '1' | '2')
+      : '0',
+  )
+
+  const onSave = () => {
+    save.mutate({
+      id: config.id,
+      configValues: {
+        baseUrl: baseUrl.trim(),
+        appId: appId.trim(),
+        appSecret: appSecret.trim(),
+        chConvert: Number(chConvert),
+      },
+    })
+  }
+
+  return (
+    <div className="settings-fields">
+      <p className="settings-drawer-note">
+        官方 API 对所有接口要求 AppId 签名。请填写自有 AppId / AppSecret,或填入已代签的代理地址,二选一即可。
+      </p>
+      <Field label="代理地址" hint="留空则直连官方 https://api.dandanplay.net">
+        <input
+          className="settings-input"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          placeholder="https://your-proxy.example.com/ddp"
+          spellCheck={false}
+        />
+      </Field>
+      <Field label="AppId">
+        <input
+          className="settings-input"
+          value={appId}
+          onChange={(e) => setAppId(e.target.value)}
+          placeholder="官方申请的 AppId"
+          spellCheck={false}
+        />
+      </Field>
+      <Field label="AppSecret" hint="仅保存在本机,代理代签时可留空">
+        <input
+          className="settings-input"
+          type="password"
+          value={appSecret}
+          onChange={(e) => setAppSecret(e.target.value)}
+          placeholder="••••••••"
+          spellCheck={false}
+        />
+      </Field>
+      <Field label="简繁转换">
+        <Segmented
+          value={chConvert}
+          onChange={setChConvert}
+          options={[
+            { value: '0', label: '不转换' },
+            { value: '1', label: '简体' },
+            { value: '2', label: '繁体' },
+          ]}
+        />
+      </Field>
+      <div className="settings-drawer-actions">
+        <Button onClick={onSave} disabled={save.isPending}>
+          {save.isPending ? '保存中…' : '保存配置'}
+        </Button>
+        {save.isSuccess && <span className="settings-test-result is-ok">✓ 已保存并生效</span>}
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="settings-field">
+      <div className="settings-field-meta">
+        <span className="settings-field-label">{label}</span>
+        {hint && <span className="settings-field-hint">{hint}</span>}
+      </div>
+      {children}
+    </label>
   )
 }

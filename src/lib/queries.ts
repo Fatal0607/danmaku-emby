@@ -1,10 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ServerInput } from '@shared/types/emby'
 import type { MediaKind } from '@shared/types/domain'
-import type { DanmakuMatchInput, DanmakuProvider, ProviderConfig } from '@shared/types/danmaku'
+import type {
+  DanmakuMatchInput,
+  DanmakuProvider,
+  DanmakuSeriesMatchInput,
+  ProviderConfig,
+} from '@shared/types/danmaku'
 import { useUI } from './store'
 import { getDataSource } from './dataSource'
-import { getDanmakuSource, type ManualFetchArgs } from './danmakuSource'
+import { getDanmakuSource, type ManualFetchArgs, type ManualSeriesArgs } from './danmakuSource'
 
 // TanStack Query hooks over the DataSource (docs 01 §1.5: server state lives in
 // TanStack Query, not the Zustand client store). Keys are namespaced by server.
@@ -25,6 +30,7 @@ export const qk = {
   danmakuProviders: ['danmakuProviders'] as const,
   danmakuConfigs: ['danmakuConfigs'] as const,
   danmakuTrack: (s: string, id: string) => ['danmakuTrack', s, id] as const,
+  danmakuSeriesMatch: (s: string, id: string) => ['danmakuSeriesMatch', s, id] as const,
   danmakuSearch: (term: string) => ['danmakuSearch', term] as const,
   danmakuEpisodes: (p: string, sid: string) => ['danmakuEpisodes', p, sid] as const,
 }
@@ -151,6 +157,17 @@ export function useSetProviderEnabled() {
   )
 }
 
+export function useSetProviderConfig() {
+  return useProviderConfigMutation((args: { id: string; configValues: Record<string, unknown> }) =>
+    dds().setProviderConfig(args.id, args.configValues),
+  )
+}
+
+/** Run a provider connectivity self-check (no cache writes). */
+export function useTestProvider() {
+  return useMutation({ mutationFn: (id: string) => dds().testProvider(id) })
+}
+
 export function useReorderProviders() {
   return useProviderConfigMutation((orderedIds: string[]) => dds().reorderProviders(orderedIds))
 }
@@ -162,6 +179,27 @@ export function useDanmakuTrack(input?: DanmakuMatchInput) {
     queryFn: () => dds().autoMatch(input!),
     enabled: !!input,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Auto-match a whole series to a danmaku season + episode list (series detail). */
+export function useDanmakuSeriesMatch(input?: DanmakuSeriesMatchInput) {
+  return useQuery({
+    queryKey: qk.danmakuSeriesMatch(input?.serverId ?? '', input?.embyItemId ?? ''),
+    queryFn: () => dds().autoMatchSeries(input!),
+    enabled: !!input,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Persist a manual series→season choice, refreshing the series match. */
+export function useSaveManualSeries() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: ManualSeriesArgs) => dds().saveManualSeries(args),
+    onSuccess: (data, args) => {
+      qc.setQueryData(qk.danmakuSeriesMatch(args.serverId, args.embyItemId), data)
+    },
   })
 }
 

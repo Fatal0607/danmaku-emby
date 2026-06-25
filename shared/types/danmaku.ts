@@ -47,12 +47,22 @@ export interface ProviderConfig {
   sortOrder: number
 }
 
-/** Persisted Emby-item → danmaku-track mapping (docs 05 danmaku_map). */
+/**
+ * Persisted Emby-item → danmaku mapping (docs 05 danmaku_map).
+ *
+ * Two row shapes share this table, distinguished by `indexedId`:
+ * - Episode/movie rows: `embyItemId` is the playable item, `indexedId` is the
+ *   provider episode id.
+ * - Series rows: `embyItemId` is the series, `indexedId` is `''` — the mapping
+ *   pins a whole season so siblings resolve by episode number (docs 04 §4.6).
+ */
 export interface DanmakuMapping {
   embyItemId: string
   serverId: string
   provider: DanmakuProvider
   seasonId: string
+  /** Season display name, kept so the UI can label a remembered match. */
+  seasonTitle?: string
   indexedId: string
   source: 'auto' | 'manual'
   matchedAt: number
@@ -66,8 +76,37 @@ export interface DanmakuMatchInput {
   fileSize?: number
   videoDurationSec?: number
   seriesTitle?: string
+  /** Series item id, when this is an episode — lets a season match resolve it. */
+  seriesEmbyItemId?: string
   season?: number
   episode?: number
+}
+
+/** Series-level auto-match input: resolve a whole series to a danmaku season. */
+export interface DanmakuSeriesMatchInput {
+  /** The series item id (not an episode). */
+  embyItemId: string
+  serverId: string
+  seriesTitle: string
+  season?: number
+  year?: number
+  episodeCount?: number
+}
+
+/** Result of a provider connectivity self-check (settings page). */
+export interface DanmakuTestResult {
+  ok: boolean
+  count?: number
+  message: string
+}
+
+/** A resolved series→season match plus the season's episode list. */
+export interface DanmakuSeriesMatch {
+  provider: DanmakuProvider
+  seasonId: string
+  seasonTitle: string
+  source: 'auto' | 'manual'
+  episodes: DanmakuEpisode[]
 }
 
 /** Comment parsed into structured fields for ASS rendering. */

@@ -18,6 +18,9 @@ import type {
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
   DanmakuSeason,
+  DanmakuSeriesMatch,
+  DanmakuSeriesMatchInput,
+  DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
 } from '@shared/types/danmaku'
@@ -71,10 +74,29 @@ const danmakuApi = {
   listConfigs: (): Promise<IpcResult<ProviderConfig[]>> => ipcRenderer.invoke(CH.DM_LIST_CONFIGS),
   setProviderEnabled: (id: string, enabled: boolean): Promise<IpcResult<ProviderConfig[]>> =>
     ipcRenderer.invoke(CH.DM_SET_ENABLED, id, enabled),
+  setProviderConfig: (
+    id: string,
+    configValues: Record<string, unknown>,
+  ): Promise<IpcResult<ProviderConfig[]>> =>
+    ipcRenderer.invoke(CH.DM_SET_CONFIG, id, configValues),
+  testProvider: (id: string): Promise<IpcResult<DanmakuTestResult>> =>
+    ipcRenderer.invoke(CH.DM_TEST, id),
   reorderProviders: (orderedIds: string[]): Promise<IpcResult<ProviderConfig[]>> =>
     ipcRenderer.invoke(CH.DM_REORDER, orderedIds),
   autoMatch: (input: DanmakuMatchInput): Promise<IpcResult<DanmakuTrack | null>> =>
     ipcRenderer.invoke(CH.DM_AUTO_MATCH, input),
+  autoMatchSeries: (
+    input: DanmakuSeriesMatchInput,
+  ): Promise<IpcResult<DanmakuSeriesMatch | null>> =>
+    ipcRenderer.invoke(CH.DM_AUTO_MATCH_SERIES, input),
+  saveManualSeries: (args: {
+    provider: ProviderId
+    serverId: string
+    embyItemId: string
+    seasonId: string
+    seasonTitle?: string
+  }): Promise<IpcResult<DanmakuSeriesMatch>> =>
+    ipcRenderer.invoke(CH.DM_SAVE_MANUAL_SERIES, args),
   search: (provider: ProviderId, keyword: string): Promise<IpcResult<DanmakuSeason[]>> =>
     ipcRenderer.invoke(CH.DM_SEARCH, provider, keyword),
   episodes: (provider: ProviderId, seasonId: string): Promise<IpcResult<DanmakuEpisode[]>> =>

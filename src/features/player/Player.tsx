@@ -245,12 +245,20 @@ export function Player() {
       serverId,
       fileName: item.title,
       seriesTitle: item.title,
+      // When this is an episode of a matched series, the season mapping resolves
+      // it by number instead of re-running /match (docs 04 §4.6).
+      seriesEmbyItemId: item.seriesId,
+      season: item.seasonNumber,
+      episode: item.episodeNumber,
       videoDurationSec: duration || itemDuration,
     }
   }, [
     duration,
     isRealPlayer,
     item.title,
+    item.seriesId,
+    item.seasonNumber,
+    item.episodeNumber,
     itemDuration,
     mediaQuery.isLoading,
     routeItemId,

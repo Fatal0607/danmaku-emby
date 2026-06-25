@@ -34,15 +34,26 @@ export interface DandanplayConfig {
 
 export class DandanplayProvider implements DanmakuSourceProvider {
   readonly id: ProviderId = 'dandanplay'
-  private readonly baseUrl: string
-  private readonly chConvert: number
+  private config: DandanplayConfig
 
   constructor(
     private readonly fetcher: FetchLike,
-    private readonly config: DandanplayConfig = {},
+    config: DandanplayConfig = {},
   ) {
-    this.baseUrl = (config.baseUrl ?? OFFICIAL_BASE).replace(/\/+$/, '')
-    this.chConvert = config.chConvert ?? 0
+    this.config = config
+  }
+
+  /** Apply new config from the settings page without rebuilding the instance. */
+  configure(config: DandanplayConfig): void {
+    this.config = config
+  }
+
+  private get baseUrl(): string {
+    return (this.config.baseUrl ?? OFFICIAL_BASE).replace(/\/+$/, '')
+  }
+
+  private get chConvert(): number {
+    return this.config.chConvert ?? 0
   }
 
   async match(input: DanmakuMatchInput): Promise<DanmakuEpisode | null> {
@@ -130,4 +141,22 @@ export class DandanplayProvider implements DanmakuSourceProvider {
 /** dandanplay matches on the bare filename; drop the container extension. */
 function stripExtension(fileName: string): string {
   return fileName.replace(/\.[^./\\]+$/, '')
+}
+
+/**
+ * Build a DandanplayConfig from persisted `provider_configs.config_values`.
+ * `appId` + `appSecret` (both present) form the official-API signing creds;
+ * an empty `baseUrl`/creds means "official endpoint, no signing".
+ */
+export function toDandanplayConfig(values: Record<string, unknown>): DandanplayConfig {
+  const baseUrl = typeof values.baseUrl === 'string' && values.baseUrl.trim() ? values.baseUrl.trim() : undefined
+  const appId = typeof values.appId === 'string' ? values.appId.trim() : ''
+  const appSecret = typeof values.appSecret === 'string' ? values.appSecret.trim() : ''
+  const chRaw = Number(values.chConvert)
+  const chConvert = chRaw === 1 || chRaw === 2 ? (chRaw as 1 | 2) : 0
+  return {
+    baseUrl,
+    chConvert,
+    credentials: appId && appSecret ? { appId, appSecret } : undefined,
+  }
 }

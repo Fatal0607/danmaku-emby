@@ -79,6 +79,15 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    // Series-level mappings (docs 04 §4.6): a series row pins a whole season so
+    // its episodes resolve by number. `season_title` lets the UI label a
+    // remembered match without re-searching.
+    version: 2,
+    up: (db) => {
+      db.exec(`ALTER TABLE danmaku_map ADD COLUMN season_title TEXT NOT NULL DEFAULT ''`)
+    },
+  },
 ]
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1].version
