@@ -1,6 +1,6 @@
 {
   "name": "danmaku-emby",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Emby client with bilibili-style danmaku overlay — cinema-dark glassmorphism macOS app",
   "type": "module",
@@ -59,6 +59,7 @@
     "asarUnpack": [
       "**/*.node"
     ],
+    "afterPack": "scripts/bundle-mpv-dylibs.cjs",
     "mac": {
       "category": "public.app-category.video",
       "identity": "-",
