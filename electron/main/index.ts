@@ -14,29 +14,22 @@ import { MpvEngine } from './player/MpvEngine'
 import { PlayerController } from './player/PlayerController'
 import { hasVideoFrames, type PlayerEngine } from './player/PlayerEngine'
 import { resolvePlayerEngineMode } from './player/engineMode'
+import { buildMainWindowOptions } from './windowOptions'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 let services: AppServices | null = null
 let playerController: PlayerController | null = null
 
-// Frameless macOS window with traffic-light overlay — matches the design's
-// borderless, hidden-titlebar chrome.
+// macOS uses native traffic lights with a hidden inset titlebar; other
+// platforms keep the app's frameless chrome.
 function createWindow(svc: AppServices): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    backgroundColor: '#00000000',
-    frame: false,
-    transparent: true,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.cjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  })
+  const win = new BrowserWindow(
+    buildMainWindowOptions({
+      platform: process.platform,
+      preloadPath: join(__dirname, '../preload/index.cjs'),
+    }),
+  )
   win.setBackgroundColor('#00000000')
   win.getContentView().setBackgroundColor('#00000000')
 

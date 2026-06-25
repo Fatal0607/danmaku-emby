@@ -4,7 +4,6 @@ import type { DanmakuMatchInput } from '@shared/types/danmaku'
 import { TICKS_PER_SECOND } from '@shared/types/emby'
 import type { PlayerCommand, PlayerLoadResult, PlayerVideoFramePush } from '@shared/types/player'
 import { Icon } from '@/components/ui/Icon'
-import { TrafficLights } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { catalog } from '@/lib/mockData'
 import { useCurrentServerId, useDanmakuTrack, useMediaItem } from '@/lib/queries'
@@ -390,7 +389,6 @@ export function Player() {
 
       {/* Top bar */}
       <div className="player-topbar">
-        <TrafficLights style={{ position: 'absolute', top: 18, left: 18 }} />
         <button className="player-back" onClick={() => navigate(-1)}>
           <Icon name="back" size={18} color="#fff" />
         </button>

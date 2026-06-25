@@ -1,27 +1,3 @@
-/* ---- Traffic lights ---- */
-.traffic-lights {
-  display: flex;
-  gap: 8px;
-}
-.tl {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: none;
-  padding: 0;
-  display: block;
-  -webkit-app-region: no-drag;
-}
-.tl-red {
-  background: var(--tl-red);
-}
-.tl-yellow {
-  background: var(--tl-yellow);
-}
-.tl-green {
-  background: var(--tl-green);
-}
-
 /* ---- Button ---- */
 .btn {
   border: none;

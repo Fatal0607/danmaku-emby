@@ -29,11 +29,6 @@
   --warning: #f0b042;
   --error: #f04438;
 
-  /* macOS traffic lights */
-  --tl-red: #ff5f57;
-  --tl-yellow: #febc2e;
-  --tl-green: #28c840;
-
   /* ---- Type scale ---- */
   --font-sans: -apple-system, 'SF Pro Text', 'SF Pro Display', 'PingFang SC',
     system-ui, sans-serif;

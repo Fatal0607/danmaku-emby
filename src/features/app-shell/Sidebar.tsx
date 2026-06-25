@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/ui/Icon'
-import { TrafficLights } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { useCurrentServerId, useServers } from '@/lib/queries'
 
@@ -21,9 +20,7 @@ export function Sidebar() {
 
   return (
     <aside className={`sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
-      <div className="sidebar-top">
-        <TrafficLights style={{ position: 'absolute', top: 18, left: 18 }} />
-      </div>
+      <div className="sidebar-top" />
 
       {/* Server switcher */}
       <button

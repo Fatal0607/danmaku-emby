@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '@/components/ui/Icon'
-import { Button, TrafficLights } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/primitives'
 import { useUI } from '@/lib/store'
 import { useAddServer, useServers } from '@/lib/queries'
 import './onboarding.css'
@@ -38,7 +38,6 @@ export function Onboarding() {
       <div className="onboard-backdrop" aria-hidden="true" />
       <div className="onboard-blur" aria-hidden="true" />
       <div className="onboard-vignette" aria-hidden="true" />
-      <TrafficLights style={{ position: 'absolute', top: 18, left: 18, zIndex: 50 }} />
       <div className="onboard-drag" />
 
       {/* Existing servers rail */}
