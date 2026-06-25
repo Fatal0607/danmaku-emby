@@ -23,6 +23,7 @@ import type {
   DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import type { ProviderInfo } from '../main/danmaku/ProviderRegistry'
 import type {
@@ -85,6 +86,8 @@ const danmakuApi = {
     ipcRenderer.invoke(CH.DM_REORDER, orderedIds),
   autoMatch: (input: DanmakuMatchInput): Promise<IpcResult<DanmakuTrack | null>> =>
     ipcRenderer.invoke(CH.DM_AUTO_MATCH, input),
+  rememberEpisodes: (input: RememberEpisodesInput): Promise<IpcResult<number>> =>
+    ipcRenderer.invoke(CH.DM_REMEMBER_EPISODES, input),
   autoMatchSeries: (
     input: DanmakuSeriesMatchInput,
   ): Promise<IpcResult<DanmakuSeriesMatch | null>> =>

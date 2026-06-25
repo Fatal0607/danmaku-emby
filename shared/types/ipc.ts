@@ -61,6 +61,7 @@ export const CH = {
   DM_TEST: 'danmaku:testProvider',
   DM_REORDER: 'danmaku:reorderProviders',
   DM_AUTO_MATCH: 'danmaku:autoMatch',
+  DM_REMEMBER_EPISODES: 'danmaku:rememberEpisodes',
   DM_AUTO_MATCH_SERIES: 'danmaku:autoMatchSeries',
   DM_SAVE_MANUAL_SERIES: 'danmaku:saveManualSeries',
   DM_SEARCH: 'danmaku:search',

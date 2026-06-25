@@ -174,6 +174,8 @@ interface DanmakuSeriesMatchInput {
 
 每集解析优先按 `episodeNumber` 命中,缺失则按 season 内位置(1-based)回退。一部剧只需一次整季匹配,后续每集(详情页展示、播放时拉取)都复用它,避免逐集打 `/match`。
 
+**逐集映射持久化**:整季匹配成功后,详情页把每个已解析的集一次性写成单集映射(`rememberEpisodes`,`danmaku_map` 内 `embyItemId → {provider, seasonId, episodeId}`)。这样即便某集从未播放过,其弹幕来源也已持久化记住,播放时 `autoMatch` 直接命中单集映射,连 `provider.episodes()` 解析都省掉,且重启后依旧有效。仓储拒绝用 auto 覆盖 manual,用户手动钉过的某集不会被批量写覆盖。
+
 ### 按集号外推(备选)
 `extrapolateEpisodeId()` 保留:弹弹play 同番剧 episodeId 连续,可由已知集 id 偏移推算邻集。现以"整季 season 的 episode 列表 + 集号"为主,外推为兜底。命中后仍校验标题。
 

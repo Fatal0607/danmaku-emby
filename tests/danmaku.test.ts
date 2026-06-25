@@ -387,6 +387,61 @@ describe('MatchService series matching', () => {
     expect(ep?.source).toBe('manual')
     expect(ep?.indexedId).toBe('201')
   })
+
+  test('rememberEpisodes persists rows so autoMatch skips re-resolving', async () => {
+    const map = new FakeMapRepo()
+    const provider = seasonProvider()
+    const svc = new MatchService(registryOf(provider), map as unknown as DanmakuMapRepo)
+    await svc.autoMatchSeries({
+      embyItemId: 'series1',
+      serverId: 's1',
+      seriesTitle: '星海彼端',
+      episodeCount: 12,
+    })
+    const written = svc.rememberEpisodes({
+      serverId: 's1',
+      provider: 'dandanplay',
+      seasonId: 'tv',
+      source: 'auto',
+      episodes: [
+        { embyItemId: 'ep1', indexedId: '201' },
+        { embyItemId: 'ep2', indexedId: '202' },
+      ],
+    })
+    expect(written).toBe(2)
+
+    const callsBefore = (provider.episodes as ReturnType<typeof vi.fn>).mock.calls.length
+    const ep = await svc.autoMatch({
+      embyItemId: 'ep2',
+      serverId: 's1',
+      fileName: 'x.mkv',
+      seriesEmbyItemId: 'series1',
+      episode: 2,
+    })
+    expect(ep?.indexedId).toBe('202')
+    // Served from the remembered row — no fresh episodes() resolution.
+    expect((provider.episodes as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore)
+  })
+
+  test('rememberEpisodes does not clobber a manual episode pick', () => {
+    const map = new FakeMapRepo()
+    const svc = new MatchService(registryOf(seasonProvider()), map as unknown as DanmakuMapRepo)
+    svc.saveManual({
+      provider: 'dandanplay',
+      serverId: 's1',
+      embyItemId: 'ep1',
+      seasonId: 'tv',
+      indexedId: '999',
+    })
+    svc.rememberEpisodes({
+      serverId: 's1',
+      provider: 'dandanplay',
+      seasonId: 'tv',
+      source: 'auto',
+      episodes: [{ embyItemId: 'ep1', indexedId: '201' }],
+    })
+    expect(map.get('s1', 'ep1')?.indexedId).toBe('999')
+  })
 })
 
 describe('ProviderRegistry', () => {

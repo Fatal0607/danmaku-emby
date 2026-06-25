@@ -6,6 +6,7 @@ import type {
   DanmakuProvider,
   DanmakuSeriesMatchInput,
   ProviderConfig,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import { useUI } from './store'
 import { getDataSource } from './dataSource'
@@ -190,6 +191,11 @@ export function useDanmakuSeriesMatch(input?: DanmakuSeriesMatchInput) {
     enabled: !!input,
     staleTime: 5 * 60 * 1000,
   })
+}
+
+/** Durably persist resolved episode→source rows (fire-and-forget memoization). */
+export function useRememberEpisodes() {
+  return useMutation({ mutationFn: (input: RememberEpisodesInput) => dds().rememberEpisodes(input) })
 }
 
 /** Persist a manual series→season choice, refreshing the series match. */

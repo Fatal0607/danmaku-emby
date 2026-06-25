@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type {
   DanmakuEpisode,
@@ -17,6 +17,7 @@ import {
   useDanmakuTrack,
   useEpisodes,
   useMediaItem,
+  useRememberEpisodes,
 } from '@/lib/queries'
 import { DanmakuMatch } from '@/features/player/DanmakuMatch'
 import './detail.css'
@@ -95,6 +96,33 @@ export function Detail() {
     () => indexByEpisodeNumber(seriesMatch?.episodes ?? []),
     [seriesMatch],
   )
+
+  // Once a series is matched, durably remember every resolved episode's source
+  // so the player never re-resolves it (docs 04 §4.6). Runs once per season.
+  const rememberEpisodes = useRememberEpisodes()
+  const rememberedKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (!serverId || !seriesMatch || !episodeSeriesId || episodeList.length === 0) return
+    const key = `${episodeSeriesId}:${seriesMatch.provider}:${seriesMatch.seasonId}:${episodeList.length}`
+    if (rememberedKey.current === key) return
+    const episodes = episodeList
+      .map((ep) => {
+        const dmEp = danmakuEpByNumber.get(ep.number)
+        return dmEp ? { embyItemId: ep.id, indexedId: dmEp.indexedId } : null
+      })
+      .filter((e): e is { embyItemId: string; indexedId: string } => e !== null)
+    if (episodes.length === 0) return
+    rememberedKey.current = key
+    rememberEpisodes.mutate({
+      serverId,
+      provider: seriesMatch.provider,
+      seasonId: seriesMatch.seasonId,
+      source: seriesMatch.source,
+      episodes,
+    })
+    // rememberEpisodes is a stable mutation; excluded to avoid re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId, seriesMatch, episodeSeriesId, episodeList, danmakuEpByNumber])
 
   if (isLoading) return <PageSpinner label="加载详情…" />
   if (isError || !item) return <ErrorState error={error} onRetry={() => refetch()} />

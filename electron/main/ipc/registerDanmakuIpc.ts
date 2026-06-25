@@ -5,6 +5,7 @@ import type {
   DanmakuMatchInput,
   DanmakuProvider as ProviderId,
   DanmakuSeriesMatchInput,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import type { AppServices } from '../AppServices'
 import { DanmakuError } from '../danmaku/errors'
@@ -42,6 +43,9 @@ export function registerDanmakuIpc(services: AppServices): void {
     services.danmakuReorderProviders(orderedIds as string[]),
   )
   handle(CH.DM_AUTO_MATCH, (input) => services.danmakuAutoMatch(input as DanmakuMatchInput))
+  handle(CH.DM_REMEMBER_EPISODES, (input) =>
+    services.danmakuRememberEpisodes(input as RememberEpisodesInput),
+  )
   handle(CH.DM_AUTO_MATCH_SERIES, (input) =>
     services.danmakuAutoMatchSeries(input as DanmakuSeriesMatchInput),
   )

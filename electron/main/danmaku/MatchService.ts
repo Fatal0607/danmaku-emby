@@ -5,6 +5,7 @@ import type {
   DanmakuProvider as ProviderId,
   DanmakuSeason,
   DanmakuSeriesMatchInput,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import type { DanmakuMapRepo } from '../store/repositories/DanmakuRepos'
 import type { ProviderRegistry } from './ProviderRegistry'
@@ -121,6 +122,30 @@ export class MatchService {
     const mapping = this.episodeMapping(input, series.provider, episode, source, series.seasonId)
     this.mapRepo.put(mapping)
     return mapping
+  }
+
+  /**
+   * Durably persist already-resolved episode→source rows for a series (docs 04
+   * §4.6), so each episode is remembered without the player re-resolving. The
+   * repo refuses to clobber a manual row with an auto one, so manual per-episode
+   * picks survive. Returns how many rows were written.
+   */
+  rememberEpisodes(input: RememberEpisodesInput): number {
+    let written = 0
+    for (const ep of input.episodes) {
+      if (!ep.embyItemId || !ep.indexedId) continue
+      this.mapRepo.put({
+        embyItemId: ep.embyItemId,
+        serverId: input.serverId,
+        provider: input.provider,
+        seasonId: input.seasonId,
+        indexedId: ep.indexedId,
+        source: input.source,
+        matchedAt: Date.now(),
+      })
+      written++
+    }
+    return written
   }
 
   private episodeMapping(

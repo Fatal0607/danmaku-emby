@@ -93,6 +93,24 @@ export interface DanmakuSeriesMatchInput {
   episodeCount?: number
 }
 
+/** One Emby episode → danmaku episode id pair, for bulk mapping persistence. */
+export interface DanmakuEpisodeRef {
+  embyItemId: string
+  indexedId: string
+}
+
+/**
+ * Bulk-persist resolved episode→source mappings for a matched series, so each
+ * episode is remembered durably and the player never re-resolves (docs 04 §4.6).
+ */
+export interface RememberEpisodesInput {
+  serverId: string
+  provider: DanmakuProvider
+  seasonId: string
+  source: 'auto' | 'manual'
+  episodes: DanmakuEpisodeRef[]
+}
+
 /** Result of a provider connectivity self-check (settings page). */
 export interface DanmakuTestResult {
   ok: boolean

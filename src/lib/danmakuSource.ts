@@ -8,6 +8,7 @@ import type {
   DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import type { ProviderInfo } from '../../electron/main/danmaku/ProviderRegistry'
 import { getApi, isElectron, unwrap } from './ipc'
@@ -45,6 +46,8 @@ export interface DanmakuSource {
   testProvider(id: string): Promise<DanmakuTestResult>
   reorderProviders(orderedIds: string[]): Promise<ProviderConfig[]>
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null>
+  /** Durably persist resolved episode→source rows so matches survive restarts. */
+  rememberEpisodes(input: RememberEpisodesInput): Promise<number>
   /** Resolve a whole series to a danmaku season + its episode list. */
   autoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null>
   /** Persist a manual series→season choice and return its episode list. */
@@ -82,6 +85,10 @@ class ElectronDanmakuSource implements DanmakuSource {
 
   autoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
     return unwrap(getApi().danmaku.autoMatch(input))
+  }
+
+  rememberEpisodes(input: RememberEpisodesInput): Promise<number> {
+    return unwrap(getApi().danmaku.rememberEpisodes(input))
   }
 
   autoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null> {
@@ -215,6 +222,11 @@ class MockDanmakuSource implements DanmakuSource {
 
   async autoMatch(): Promise<DanmakuTrack | null> {
     return MOCK_TRACK
+  }
+
+  async rememberEpisodes(input: RememberEpisodesInput): Promise<number> {
+    // No SQLite in the browser preview; report the count as if persisted.
+    return input.episodes.length
   }
 
   async autoMatchSeries(): Promise<DanmakuSeriesMatch | null> {

@@ -7,6 +7,7 @@ import type {
   DanmakuSeriesMatch,
   DanmakuSeriesMatchInput,
   DanmakuTrack,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import type { DanmakuCacheRepo, DanmakuMapRepo } from '../store/repositories/DanmakuRepos'
 import { toAss, type AssOptions } from './render/toAss'
@@ -61,6 +62,11 @@ export class DanmakuService {
   }): Promise<DanmakuSeriesMatch> {
     const mapping = this.match.saveManualSeries(args)
     return this.buildSeriesMatch(mapping)
+  }
+
+  /** Persist resolved episode→source rows so matches survive without re-resolving. */
+  rememberEpisodes(input: RememberEpisodesInput): number {
+    return this.match.rememberEpisodes(input)
   }
 
   private async buildSeriesMatch(mapping: DanmakuMapping): Promise<DanmakuSeriesMatch> {

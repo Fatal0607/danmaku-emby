@@ -21,6 +21,7 @@ import type {
   DanmakuTestResult,
   DanmakuTrack,
   ProviderConfig,
+  RememberEpisodesInput,
 } from '@shared/types/danmaku'
 import { Store } from './store/Store'
 import { SecretService } from './secret/SecretService'
@@ -198,6 +199,11 @@ export class AppServices {
 
   danmakuAutoMatch(input: DanmakuMatchInput): Promise<DanmakuTrack | null> {
     return this.danmaku.autoMatchAndFetch(input)
+  }
+
+  /** Persist resolved episode→source rows for a matched series (memoize matches). */
+  danmakuRememberEpisodes(input: RememberEpisodesInput): number {
+    return this.danmaku.rememberEpisodes(input)
   }
 
   danmakuAutoMatchSeries(input: DanmakuSeriesMatchInput): Promise<DanmakuSeriesMatch | null> {
