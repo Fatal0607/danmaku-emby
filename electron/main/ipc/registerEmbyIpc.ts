@@ -44,6 +44,9 @@ export function registerEmbyIpc(services: AppServices): void {
   handle(CH.EMBY_REMOVE_SERVER, (serverId) => services.removeServer(serverId as string))
   handle(CH.EMBY_VIEWS, (serverId) => services.getViews(serverId as string))
   handle(CH.EMBY_ITEMS, (query) => services.getItems(query as ItemsQuery))
+  handle(CH.EMBY_RESUME_ITEMS, (serverId, limit) =>
+    services.getResumeItems(serverId as string, limit as number | undefined),
+  )
   handle(CH.EMBY_ITEM, (serverId, itemId) =>
     services.getItem(serverId as string, itemId as string),
   )

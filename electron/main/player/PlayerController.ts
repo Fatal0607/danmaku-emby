@@ -38,6 +38,7 @@ interface CurrentPlayback {
   serverId: string
   itemId: string
   mediaSourceId: string
+  playSessionId?: string
   playMethod: PlaybackSource['mode']
 }
 
@@ -87,6 +88,7 @@ export class PlayerController {
       serverId: req.serverId,
       itemId: req.itemId,
       mediaSourceId: src.mediaSourceId,
+      playSessionId: src.playSessionId,
       playMethod: src.mode,
     }
     this.lastState = {
@@ -196,7 +198,7 @@ export class PlayerController {
     this.sender.send(toPush(this.lastState))
     if (this.current && this.now() - this.lastReportAt >= this.progressIntervalMs) {
       this.lastReportAt = this.now()
-      void this.report('progress')
+      void this.report('progress', undefined, 'TimeUpdate')
     }
   }
 
@@ -204,7 +206,7 @@ export class PlayerController {
     if (this.disposed) return
     this.lastState = { ...this.lastState, paused: s.paused }
     this.sender.send(toPush(this.lastState))
-    void this.report('progress')
+    void this.report('progress', undefined, s.paused ? 'Pause' : 'Unpause')
   }
 
   private onEnded(s: PlayerStateEvent): void {
@@ -217,6 +219,7 @@ export class PlayerController {
   private async report(
     event: ProgressReport['event'],
     cur = this.current,
+    progressEventName?: ProgressReport['progressEventName'],
   ): Promise<void> {
     if (!cur) return
     try {
@@ -224,9 +227,11 @@ export class PlayerController {
         serverId: cur.serverId,
         itemId: cur.itemId,
         mediaSourceId: cur.mediaSourceId,
+        playSessionId: cur.playSessionId,
         positionTicks: Math.round(this.lastState.timeSec * TICKS_PER_SECOND),
         isPaused: this.lastState.paused,
         event,
+        progressEventName,
         playMethod: cur.playMethod,
       })
     } catch {

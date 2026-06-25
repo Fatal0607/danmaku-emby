@@ -95,6 +95,7 @@ describe('resolvePlaybackSource', () => {
         /PlaybackInfo/,
         {
           data: {
+            PlaySessionId: 'play-session-1',
             MediaSources: [
               {
                 Id: 'ms1',
@@ -119,6 +120,7 @@ describe('resolvePlaybackSource', () => {
     expect(src.url).toContain('api_key=tok-123')
     expect(src.url).toContain('DeviceId=dev-uuid')
     expect(src.fileName).toBe('S01E07.mkv')
+    expect(src.playSessionId).toBe('play-session-1')
     expect(src.audioStreams[0].codec).toBe('ac3')
     expect(src.subtitleStreams[0].codec).toBe('ass')
   })
@@ -146,6 +148,122 @@ describe('resolvePlaybackSource', () => {
     await expect(
       makeService(fetcher).resolvePlaybackSource(SERVER, 'item9'),
     ).rejects.toMatchObject({ code: 'EMBY_NO_SOURCE' })
+  })
+})
+
+describe('reportProgress', () => {
+  test('reports playback start with the Emby check-in payload shape', async () => {
+    const fetcher = fakeFetcher([[/Sessions\/Playing$/, { data: {} }]])
+    await makeService(fetcher).reportProgress(SERVER, {
+      serverId: SERVER.id,
+      itemId: 'item9',
+      mediaSourceId: 'ms1',
+      playSessionId: 'play-session-1',
+      positionTicks: 123,
+      isPaused: false,
+      event: 'start',
+      playMethod: 'directPlay',
+    })
+
+    const req = vi.mocked(fetcher.request).mock.calls[0][0]
+    expect(req.url).toBe('https://emby.local:8096/Sessions/Playing')
+    expect(JSON.parse(String(req.body))).toMatchObject({
+      QueueableMediaTypes: ['Video'],
+      CanSeek: true,
+      ItemId: 'item9',
+      MediaSourceId: 'ms1',
+      PlaySessionId: 'play-session-1',
+      PositionTicks: 123,
+      IsPaused: false,
+      IsMuted: false,
+      PlayMethod: 'DirectPlay',
+    })
+    expect(JSON.parse(String(req.body))).not.toHaveProperty('EventName')
+  })
+
+  test('reports progress with an Emby EventName and normalized PlayMethod', async () => {
+    const fetcher = fakeFetcher([[/Sessions\/Playing\/Progress$/, { data: {} }]])
+    await makeService(fetcher).reportProgress(SERVER, {
+      serverId: SERVER.id,
+      itemId: 'item9',
+      mediaSourceId: 'ms1',
+      playSessionId: 'play-session-1',
+      positionTicks: 456,
+      isPaused: true,
+      event: 'progress',
+      progressEventName: 'Pause',
+      playMethod: 'directStream',
+    })
+
+    const req = vi.mocked(fetcher.request).mock.calls[0][0]
+    expect(req.url).toBe('https://emby.local:8096/Sessions/Playing/Progress')
+    expect(JSON.parse(String(req.body))).toMatchObject({
+      EventName: 'Pause',
+      PlayMethod: 'DirectStream',
+      PositionTicks: 456,
+      IsPaused: true,
+    })
+  })
+
+  test('reports stop with the final playback position', async () => {
+    const fetcher = fakeFetcher([[/Sessions\/Playing\/Stopped$/, { data: {} }]])
+    await makeService(fetcher).reportProgress(SERVER, {
+      serverId: SERVER.id,
+      itemId: 'item9',
+      mediaSourceId: 'ms1',
+      playSessionId: 'play-session-1',
+      positionTicks: 789,
+      isPaused: true,
+      event: 'stop',
+      playMethod: 'transcode',
+    })
+
+    const req = vi.mocked(fetcher.request).mock.calls[0][0]
+    expect(req.url).toBe('https://emby.local:8096/Sessions/Playing/Stopped')
+    expect(JSON.parse(String(req.body))).toMatchObject({
+      PlaySessionId: 'play-session-1',
+      PositionTicks: 789,
+      IsPaused: true,
+      PlayMethod: 'Transcode',
+    })
+  })
+})
+
+describe('getResumeItems', () => {
+  test('loads latest resumable items from Emby resume endpoint', async () => {
+    const fetcher = fakeFetcher([
+      [
+        /\/Users\/u1\/Items\/Resume\?/,
+        {
+          data: {
+            Items: [
+              {
+                Id: 'resume-1',
+                Name: 'Half Watched',
+                Type: 'Movie',
+                RunTimeTicks: 1000,
+                UserData: { PlaybackPositionTicks: 250 },
+              },
+            ],
+            TotalRecordCount: 1,
+          },
+        },
+      ],
+    ])
+
+    const page = await makeService(fetcher).getResumeItems(SERVER, 12)
+    const req = vi.mocked(fetcher.request).mock.calls[0][0]
+    const url = new URL(req.url)
+
+    expect(url.pathname).toBe('/Users/u1/Items/Resume')
+    expect(url.searchParams.get('Limit')).toBe('12')
+    expect(url.searchParams.get('MediaTypes')).toBe('Video')
+    expect(url.searchParams.get('Fields')).toContain('UserData')
+    expect(page.items[0]).toMatchObject({
+      id: 'resume-1',
+      playbackPositionTicks: 250,
+      playedPercentage: 0.25,
+    })
   })
 })
 

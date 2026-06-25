@@ -175,6 +175,24 @@ export class EmbyService {
     }
   }
 
+  async getResumeItems(server: EmbyServer, limit = 12): Promise<Page<EmbyItem>> {
+    const params = new URLSearchParams({
+      Limit: String(limit),
+      MediaTypes: 'Video',
+      Fields: 'Overview,Genres,MediaSources,UserData,ProductionYear',
+    })
+
+    const data = await this.get<RawItemsResponse>(
+      server,
+      `/Users/${server.userId}/Items/Resume?${params.toString()}`,
+    )
+    return {
+      items: data.Items.map((it) => mapItem(it, server.id)),
+      total: data.TotalRecordCount,
+      startIndex: 0,
+    }
+  }
+
   async getItem(server: EmbyServer, itemId: string): Promise<EmbyItem> {
     const data = await this.get<RawItem>(server, `/Users/${server.userId}/Items/${itemId}`)
     return mapItem(data, server.id)
@@ -226,6 +244,7 @@ export class EmbyService {
     return {
       itemId,
       mediaSourceId: source.Id,
+      playSessionId: info.PlaySessionId,
       url,
       mode,
       startTicks,
@@ -273,13 +292,18 @@ export class EmbyService {
         : report.event === 'stop'
           ? '/Sessions/Playing/Stopped'
           : '/Sessions/Playing/Progress'
-    await this.post(server, path, {
+    await this.post(server, path, compact({
+      QueueableMediaTypes: ['Video'],
+      CanSeek: true,
       ItemId: report.itemId,
       MediaSourceId: report.mediaSourceId,
+      PlaySessionId: report.playSessionId,
       PositionTicks: report.positionTicks,
       IsPaused: report.isPaused,
-      PlayMethod: report.playMethod,
-    })
+      IsMuted: false,
+      PlayMethod: report.playMethod ? toEmbyPlayMethod(report.playMethod) : undefined,
+      EventName: report.event === 'progress' ? (report.progressEventName ?? 'TimeUpdate') : undefined,
+    }))
   }
 
   imageUrl(server: EmbyServer, itemId: string, type: ImageType, tag?: string, height = 400): string {
@@ -404,3 +428,20 @@ function basename(p: string): string {
 
 export const secondsToTicks = (sec: number): number => Math.round(sec * TICKS_PER_SECOND)
 export const ticksToSeconds = (ticks: number): number => ticks / TICKS_PER_SECOND
+
+function toEmbyPlayMethod(mode: PlaybackMode): 'DirectPlay' | 'DirectStream' | 'Transcode' {
+  switch (mode) {
+    case 'directPlay':
+      return 'DirectPlay'
+    case 'directStream':
+      return 'DirectStream'
+    case 'transcode':
+      return 'Transcode'
+  }
+}
+
+function compact<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as T
+}

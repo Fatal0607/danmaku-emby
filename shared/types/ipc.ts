@@ -15,6 +15,8 @@ export type IpcErrorCode =
   | 'DM_PARSE_FAILED'
   // Player
   | 'PLAYER_LOAD_FAILED'
+  // Updates
+  | 'UPDATE_CHECK_FAILED'
   // Generic
   | 'BAD_REQUEST'
   | 'INTERNAL'
@@ -33,12 +35,17 @@ export const CH = {
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_TOGGLE_MAXIMIZE: 'window:toggleMaximize',
   WINDOW_TOGGLE_FULLSCREEN: 'window:toggleFullscreen',
+  // Updates
+  UPDATE_CURRENT: 'update:current',
+  UPDATE_CHECK: 'update:check',
+  UPDATE_OPEN_RELEASE: 'update:openRelease',
   // Emby
   EMBY_ADD_SERVER: 'emby:addServer',
   EMBY_LIST_SERVERS: 'emby:listServers',
   EMBY_REMOVE_SERVER: 'emby:removeServer',
   EMBY_VIEWS: 'emby:views',
   EMBY_ITEMS: 'emby:items',
+  EMBY_RESUME_ITEMS: 'emby:resumeItems',
   EMBY_ITEM: 'emby:item',
   EMBY_SEASONS: 'emby:seasons',
   EMBY_EPISODES: 'emby:episodes',

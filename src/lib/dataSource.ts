@@ -77,17 +77,7 @@ class EmbyDataSource implements DataSource {
 
   async continueWatching(serverId: string): Promise<MediaItem[]> {
     const base = await this.baseUrl(serverId)
-    const page = await unwrap(
-      getApi().emby.items({
-        serverId,
-        recursive: true,
-        includeItemTypes: ['Movie', 'Episode'],
-        filters: ['IsResumable'],
-        sortBy: 'DatePlayed',
-        sortOrder: 'Descending',
-        limit: 12,
-      }),
-    )
+    const page = await unwrap(getApi().emby.resumeItems(serverId, 12))
     return page.items.map((i) => embyItemToMedia(i, base))
   }
 

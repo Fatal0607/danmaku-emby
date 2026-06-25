@@ -11,12 +11,22 @@ import type {
 import { useUI } from './store'
 import { getDataSource } from './dataSource'
 import { getDanmakuSource, type ManualFetchArgs, type ManualSeriesArgs } from './danmakuSource'
+import { getUpdateSource } from './updateSource'
 
 // TanStack Query hooks over the DataSource (docs 01 §1.5: server state lives in
 // TanStack Query, not the Zustand client store). Keys are namespaced by server.
 
 const ds = () => getDataSource()
 const dds = () => getDanmakuSource()
+const uds = () => getUpdateSource()
+
+export const continueWatchingLiveQueryOptions = {
+  staleTime: 0,
+  gcTime: 0,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: 'always',
+  refetchOnReconnect: 'always',
+} as const
 
 export const qk = {
   servers: ['servers'] as const,
@@ -34,6 +44,7 @@ export const qk = {
   danmakuSeriesMatch: (s: string, id: string) => ['danmakuSeriesMatch', s, id] as const,
   danmakuSearch: (term: string) => ['danmakuSearch', term] as const,
   danmakuEpisodes: (p: string, sid: string) => ['danmakuEpisodes', p, sid] as const,
+  updateCurrent: ['updateCurrent'] as const,
 }
 
 export function useServers() {
@@ -53,6 +64,7 @@ export function useContinueWatching(serverId?: string) {
     queryKey: qk.continueWatching(serverId ?? ''),
     queryFn: () => ds().continueWatching(serverId!),
     enabled: !!serverId,
+    ...continueWatchingLiveQueryOptions,
   })
 }
 
@@ -232,4 +244,14 @@ export function useFetchManualDanmaku() {
     onSuccess: (_data, args) =>
       qc.invalidateQueries({ queryKey: qk.danmakuTrack(args.serverId, args.embyItemId) }),
   })
+}
+
+// ---- Updates ----
+
+export function useCurrentUpdateInfo() {
+  return useQuery({ queryKey: qk.updateCurrent, queryFn: () => uds().current() })
+}
+
+export function useCheckForUpdates() {
+  return useMutation({ mutationFn: () => uds().checkForUpdates() })
 }

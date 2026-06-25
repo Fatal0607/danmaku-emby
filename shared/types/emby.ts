@@ -94,6 +94,7 @@ export type PlaybackMode = 'directPlay' | 'directStream' | 'transcode'
 export interface PlaybackSource {
   itemId: string
   mediaSourceId: string
+  playSessionId?: string
   url: string
   mode: PlaybackMode
   startTicks: number
@@ -110,9 +111,11 @@ export interface ProgressReport {
   serverId: string
   itemId: string
   mediaSourceId: string
+  playSessionId?: string
   positionTicks: number
   isPaused: boolean
   event: 'start' | 'progress' | 'stop'
+  progressEventName?: 'TimeUpdate' | 'Pause' | 'Unpause'
   playMethod?: PlaybackMode
 }
 

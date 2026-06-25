@@ -60,6 +60,7 @@ class FakeEngine implements PlayerEngine {
 const SRC: PlaybackSource = {
   itemId: 'i',
   mediaSourceId: 'ms',
+  playSessionId: 'play-session-1',
   url: 'http://emby/stream',
   mode: 'directPlay',
   startTicks: 0,
@@ -170,6 +171,10 @@ describe('PlayerController', () => {
     const progress = emby.reports.filter((r) => r.event === 'progress')
     expect(progress).toHaveLength(1)
     expect(progress[0].positionTicks).toBe(10 * TICKS_PER_SECOND)
+    expect(progress[0]).toMatchObject({
+      playSessionId: 'play-session-1',
+      progressEventName: 'TimeUpdate',
+    })
     expect(pushes.at(-1)).toMatchObject({ timeSec: 10, durationSec: 60 })
   })
 
@@ -179,7 +184,26 @@ describe('PlayerController', () => {
     engine.fire('pause', { timeSec: 3, durationSec: 60, paused: true, ended: false })
 
     expect(pushes.at(-1)).toMatchObject({ paused: true })
-    expect(emby.reports.at(-1)).toMatchObject({ event: 'progress', isPaused: true })
+    expect(emby.reports.at(-1)).toMatchObject({
+      event: 'progress',
+      isPaused: true,
+      playSessionId: 'play-session-1',
+      progressEventName: 'Pause',
+    })
+  })
+
+  test('play event reports an Emby unpause check-in', async () => {
+    const { engine, emby, pushes, controller } = harness()
+    await controller.load({ serverId: 'srv', itemId: 'i' })
+    engine.fire('play', { timeSec: 3, durationSec: 60, paused: false, ended: false })
+
+    expect(pushes.at(-1)).toMatchObject({ paused: false })
+    expect(emby.reports.at(-1)).toMatchObject({
+      event: 'progress',
+      isPaused: false,
+      playSessionId: 'play-session-1',
+      progressEventName: 'Unpause',
+    })
   })
 
   test('ended reports stop once, and dispose does not double-report', async () => {

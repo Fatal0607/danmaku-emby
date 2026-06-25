@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3 -w @danmaku-emby/mpv-render",
     "rebuild:node": "npm rebuild better-sqlite3 @danmaku-emby/mpv-render",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac dmg zip --arm64 --publish never",
     "electron:dev": "vite build && npm run build:electron && npm run rebuild:electron && electron .",
     "electron:dev:gpu": "DMEMBY_PLAYER_ENGINE=mpv-window npm run electron:dev",
     "electron:dev:single-window": "DMEMBY_PLAYER_ENGINE=single-window npm run electron:dev",
@@ -37,8 +38,44 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^32.1.2",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.6.2",
     "vite": "^5.4.6",
     "vitest": "^4.1.9"
+  },
+  "build": {
+    "appId": "com.fatal0607.danmakuemby",
+    "productName": "DanmakuEmby",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "native/mpv-render/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    }
   }
 }

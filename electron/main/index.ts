@@ -8,12 +8,14 @@ import { AppServices } from './AppServices'
 import { registerEmbyIpc } from './ipc/registerEmbyIpc'
 import { registerDanmakuIpc } from './ipc/registerDanmakuIpc'
 import { registerPlayerIpc } from './ipc/registerPlayerIpc'
+import { registerUpdateIpc } from './ipc/registerUpdateIpc'
 import { registerWindowControlIpc } from './ipc/windowControls'
 import { LibmpvRenderEngine } from './player/LibmpvRenderEngine'
 import { MpvEngine } from './player/MpvEngine'
 import { PlayerController } from './player/PlayerController'
 import { hasVideoFrames, type PlayerEngine } from './player/PlayerEngine'
 import { resolvePlayerEngineMode } from './player/engineMode'
+import { UpdateService } from './update/UpdateService'
 import { buildMainWindowOptions } from './windowOptions'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -145,6 +147,16 @@ app.whenReady().then(() => {
   services = new AppServices(dbPath)
   registerEmbyIpc(services)
   registerDanmakuIpc(services)
+  registerUpdateIpc(
+    new UpdateService({
+      owner: process.env.DMEMBY_UPDATE_OWNER ?? 'Fatal0607',
+      repo: process.env.DMEMBY_UPDATE_REPO ?? 'danmaku-emby',
+      currentVersion: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      isPackaged: app.isPackaged,
+    }),
+  )
   registerWindowControlIpc(ipcMain, (sender) => BrowserWindow.fromWebContents(sender as WebContents))
 
   createWindow(services)

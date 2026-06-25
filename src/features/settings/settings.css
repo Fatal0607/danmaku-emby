@@ -290,3 +290,48 @@
   line-height: 1.7;
   color: var(--text-soft);
 }
+.about-update {
+  max-width: 560px;
+  margin: 28px auto 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-2);
+  text-align: left;
+}
+.about-update-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.about-update-title {
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.about-update-meta {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.about-update-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.about-update-status {
+  margin-top: 14px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.about-update-status.is-ok {
+  color: var(--success, #34c759);
+}
+.about-update-status.is-warn {
+  color: var(--warning, #f7b955);
+}
+.about-update-status.is-fail {
+  color: var(--danger, #ff5a5f);
+}

@@ -6,11 +6,14 @@ import { useUI } from '@/lib/store'
 import { servers } from '@/lib/mockData'
 import {
   useDanmakuConfigs,
+  useCheckForUpdates,
+  useCurrentUpdateInfo,
   useReorderProviders,
   useSetProviderConfig,
   useSetProviderEnabled,
   useTestProvider,
 } from '@/lib/queries'
+import { getUpdateSource } from '@/lib/updateSource'
 import '@/styles/page.css'
 import './settings.css'
 
@@ -132,23 +135,94 @@ export function Settings() {
 
           {section === '关于' && (
             <Group title="关于 DanmakuEmby" hint="">
-              <div className="about-block">
-                <div className="about-logo">
-                  <div className="onboard-logo-ring" />
-                </div>
-                <div className="about-name">DanmakuEmby</div>
-                <div className="about-version">版本 0.1.0 · macOS</div>
-                <p className="about-desc">
-                  连接自建 Emby 服务器,浏览影视/番剧并在播放时叠加 B 站式弹幕。
-                  无边框 macOS 窗口、毛玻璃材质、电光靛蓝强调色。
-                </p>
-              </div>
+              <AboutPanel />
             </Group>
           )}
         </div>
       </div>
     </div>
   )
+}
+
+function AboutPanel() {
+  const { data: current } = useCurrentUpdateInfo()
+  const check = useCheckForUpdates()
+  const result = check.data
+  const status = updateStatusText(check.error, result)
+  const canOpenRelease = !!result?.releaseUrl || !!current?.releasePageUrl
+
+  const openRelease = () => {
+    const url = result?.releaseUrl ?? current?.releasePageUrl
+    getUpdateSource().openReleasePage(url).catch(() => {})
+  }
+
+  return (
+    <div className="about-block">
+      <div className="about-logo">
+        <div className="onboard-logo-ring" />
+      </div>
+      <div className="about-name">DanmakuEmby</div>
+      <div className="about-version">
+        版本 {current?.currentVersion ?? '0.1.0'} · {platformLabel(current?.platform)}
+      </div>
+      <p className="about-desc">
+        连接自建 Emby 服务器,浏览影视/番剧并在播放时叠加 B 站式弹幕。
+        无边框 macOS 窗口、毛玻璃材质、电光靛蓝强调色。
+      </p>
+
+      <div className="about-update">
+        <div className="about-update-main">
+          <div className="about-update-title">应用更新</div>
+          <div className="about-update-meta">
+            {current?.repository ?? 'Fatal0607/danmaku-emby'}
+          </div>
+        </div>
+        <div className="about-update-actions">
+          <Button
+            variant="secondary"
+            onClick={() => check.mutate()}
+            disabled={check.isPending}
+          >
+            {check.isPending ? '检查中…' : '检查更新'}
+          </Button>
+          {canOpenRelease && (
+            <Button variant="ghost" onClick={openRelease}>
+              打开 Release
+            </Button>
+          )}
+        </div>
+        {status && (
+          <div className={`about-update-status ${status.tone === 'ok' ? 'is-ok' : status.tone === 'warn' ? 'is-warn' : 'is-fail'}`}>
+            {status.text}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function updateStatusText(
+  error: unknown,
+  result: ReturnType<typeof useCheckForUpdates>['data'],
+): { tone: 'ok' | 'warn' | 'fail'; text: string } | null {
+  if (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { tone: 'fail', text: `检查失败: ${message.replace(/^检查更新失败:\s*/, '')}` }
+  }
+  if (!result) return null
+  if (!result.updateAvailable) {
+    return { tone: 'ok', text: `已是最新版本 ${result.currentVersion}` }
+  }
+
+  const asset = result.preferredAsset ? ` · ${result.preferredAsset.name}` : ''
+  return { tone: 'warn', text: `发现新版本 ${result.latestVersion}${asset}` }
+}
+
+function platformLabel(platform?: NodeJS.Platform): string {
+  if (platform === 'darwin') return 'macOS'
+  if (platform === 'win32') return 'Windows'
+  if (platform === 'linux') return 'Linux'
+  return 'macOS'
 }
 
 function Group({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {

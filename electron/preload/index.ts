@@ -34,6 +34,7 @@ import type {
   PlayerStatePush,
   PlayerVideoFramePush,
 } from '@shared/types/player'
+import type { UpdateCheckResult, UpdateCurrentInfo } from '@shared/types/update'
 
 // Whitelisted, typed bridge (docs 06 §6.1). The renderer never sees ipcRenderer
 // directly; only these namespaced methods. Each returns the IpcResult envelope.
@@ -48,6 +49,8 @@ const embyApi = {
     ipcRenderer.invoke(CH.EMBY_VIEWS, serverId),
   items: (query: ItemsQuery): Promise<IpcResult<Page<EmbyItem>>> =>
     ipcRenderer.invoke(CH.EMBY_ITEMS, query),
+  resumeItems: (serverId: string, limit?: number): Promise<IpcResult<Page<EmbyItem>>> =>
+    ipcRenderer.invoke(CH.EMBY_RESUME_ITEMS, serverId, limit),
   item: (serverId: string, itemId: string): Promise<IpcResult<EmbyItem>> =>
     ipcRenderer.invoke(CH.EMBY_ITEM, serverId, itemId),
   episodes: (serverId: string, seriesId: string): Promise<IpcResult<EmbyItem[]>> =>
@@ -154,12 +157,21 @@ const windowApi = {
   },
 }
 
+const updateApi = {
+  current: (): Promise<IpcResult<UpdateCurrentInfo>> => ipcRenderer.invoke(CH.UPDATE_CURRENT),
+  checkForUpdates: (): Promise<IpcResult<UpdateCheckResult>> =>
+    ipcRenderer.invoke(CH.UPDATE_CHECK),
+  openReleasePage: (url?: string): Promise<IpcResult<void>> =>
+    ipcRenderer.invoke(CH.UPDATE_OPEN_RELEASE, url),
+}
+
 const api = {
   platform: process.platform,
   window: windowApi,
   emby: embyApi,
   danmaku: danmakuApi,
   player: playerApi,
+  update: updateApi,
 }
 
 export type RendererApi = typeof api

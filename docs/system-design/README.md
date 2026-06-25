@@ -17,6 +17,8 @@
 | 05 | [数据模型与持久化](05-data-model.md) | SQLite 表结构、缓存策略、内部类型 |
 | 06 | [安全与风险](06-security-and-risks.md) | 凭据存储、cookie 复用、平台风控、专利合规 |
 | 07 | [实施路线图](07-roadmap.md) | 分阶段交付、技术验证 spike、测试策略 |
+| 08 | [UI 设计提示](08-ui-design-prompt.md) | 视觉方向、组件布局与交互提示 |
+| 09 | [应用更新方案](09-updates.md) | GitHub Release 检查更新、下载与自动更新演进 |
 
 ## 1. 产品目标
 

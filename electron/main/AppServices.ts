@@ -124,6 +124,10 @@ export class AppServices {
     return this.emby.getItems(this.requireServer(query.serverId), query)
   }
 
+  getResumeItems(serverId: string, limit?: number): Promise<Page<EmbyItem>> {
+    return this.emby.getResumeItems(this.requireServer(serverId), limit)
+  }
+
   getItem(serverId: string, itemId: string): Promise<EmbyItem> {
     return this.emby.getItem(this.requireServer(serverId), itemId)
   }
