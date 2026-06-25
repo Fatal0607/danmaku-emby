@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import type { WebContents } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { CH } from '@shared/types/ipc'
@@ -7,10 +8,12 @@ import { AppServices } from './AppServices'
 import { registerEmbyIpc } from './ipc/registerEmbyIpc'
 import { registerDanmakuIpc } from './ipc/registerDanmakuIpc'
 import { registerPlayerIpc } from './ipc/registerPlayerIpc'
+import { registerWindowControlIpc } from './ipc/windowControls'
 import { LibmpvRenderEngine } from './player/LibmpvRenderEngine'
 import { MpvEngine } from './player/MpvEngine'
 import { PlayerController } from './player/PlayerController'
 import { hasVideoFrames, type PlayerEngine } from './player/PlayerEngine'
+import { resolvePlayerEngineMode } from './player/engineMode'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -77,8 +80,8 @@ function createWindow(svc: AppServices): BrowserWindow {
 }
 
 function createPlayerEngine(win: BrowserWindow): PlayerEngine {
-  const engine = process.env.DMEMBY_PLAYER_ENGINE ?? 'libmpv-render'
-  if (engine !== 'mpv' && engine !== 'mpv-window') return new LibmpvRenderEngine()
+  const engine = resolvePlayerEngineMode(process.env.DMEMBY_PLAYER_ENGINE)
+  if (engine === 'libmpv-render') return new LibmpvRenderEngine()
 
   return new MpvEngine({
     getVideoWindowBounds: () => getVideoWindowBounds(win),
@@ -149,7 +152,7 @@ app.whenReady().then(() => {
   services = new AppServices(dbPath)
   registerEmbyIpc(services)
   registerDanmakuIpc(services)
-  registerWindowControlIpc()
+  registerWindowControlIpc(ipcMain, (sender) => BrowserWindow.fromWebContents(sender as WebContents))
 
   createWindow(services)
   app.on('activate', () => {
@@ -170,22 +173,3 @@ app.on('will-quit', () => {
   void playerController?.dispose()
   services?.store.close()
 })
-
-let windowControlsRegistered = false
-
-function registerWindowControlIpc(): void {
-  if (windowControlsRegistered) return
-  windowControlsRegistered = true
-  ipcMain.on(CH.WINDOW_CLOSE, (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close()
-  })
-  ipcMain.on(CH.WINDOW_MINIMIZE, (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.minimize()
-  })
-  ipcMain.on(CH.WINDOW_TOGGLE_MAXIMIZE, (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win) return
-    if (win.isMaximized()) win.unmaximize()
-    else win.maximize()
-  })
-}

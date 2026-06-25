@@ -1,5 +1,6 @@
 import type {
   PlayerCommand,
+  PlayerDiagnostics,
   PlayerLoadRequest,
   PlayerLoadResult,
   PlayerStatePush,
@@ -14,6 +15,7 @@ export interface PlayerSource {
   readonly kind: 'electron' | 'mock'
   load(req: PlayerLoadRequest): Promise<PlayerLoadResult>
   command(cmd: PlayerCommand): Promise<void>
+  diagnostics(): Promise<PlayerDiagnostics>
   onState(cb: (state: PlayerStatePush) => void): () => void
   onFrame(cb: (frame: PlayerVideoFramePush) => void): () => void
 }
@@ -27,6 +29,10 @@ class ElectronPlayerSource implements PlayerSource {
 
   command(cmd: PlayerCommand): Promise<void> {
     return unwrap(getApi().player.command(cmd))
+  }
+
+  diagnostics(): Promise<PlayerDiagnostics> {
+    return unwrap(getApi().player.diagnostics())
   }
 
   onState(cb: (state: PlayerStatePush) => void): () => void {
@@ -47,6 +53,16 @@ class MockPlayerSource implements PlayerSource {
 
   async command(): Promise<void> {
     /* Local preview controls are handled by Player.tsx state. */
+  }
+
+  async diagnostics(): Promise<PlayerDiagnostics> {
+    return {
+      engine: 'mpv-window',
+      videoOutput: 'external-window',
+      backend: 'mock',
+      hardwareDecode: false,
+      zeroCopy: false,
+    }
   }
 
   onState(): () => void {

@@ -6,7 +6,11 @@ import {
   parseLine,
 } from '@/../electron/main/player/mpv/protocol'
 import { TICKS_PER_SECOND } from '@shared/types/emby'
-import { buildLoadfileCommand, buildMpvWindowArgs } from '@/../electron/main/player/MpvEngine'
+import {
+  buildLoadfileCommand,
+  buildMpvWindowArgs,
+  toMpvVolumePercent,
+} from '@/../electron/main/player/MpvEngine'
 
 describe('mpv protocol codec', () => {
   test('encodeCommand emits a newline-terminated request', () => {
@@ -56,8 +60,7 @@ describe('mpv protocol codec', () => {
     const args = buildMpvWindowArgs({
       bounds: { x: 12.4, y: 34.6, width: 1440.2, height: 900.3 },
     })
-    expect(args).toContain('--autofit-larger=1440x900')
-    expect(args).toContain('--geometry=50%:50%')
+    expect(args).toContain('--geometry=1440x900+12+35')
     expect(args).toContain('--ontop')
   })
 
@@ -70,5 +73,14 @@ describe('mpv protocol codec', () => {
     expect(args).not.toContain('--ontop')
     expect(args.some((arg) => arg.startsWith('--autofit-larger='))).toBe(false)
     expect(args.some((arg) => arg.startsWith('--geometry='))).toBe(false)
+  })
+
+  test('toMpvVolumePercent maps renderer volume to mpv percentage', () => {
+    expect(toMpvVolumePercent(0)).toBe(0)
+    expect(toMpvVolumePercent(0.42)).toBe(42)
+    expect(toMpvVolumePercent(1)).toBe(100)
+    expect(toMpvVolumePercent(-0.1)).toBe(0)
+    expect(toMpvVolumePercent(1.2)).toBe(100)
+    expect(toMpvVolumePercent(Number.NaN)).toBe(100)
   })
 })

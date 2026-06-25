@@ -18,6 +18,31 @@ export interface PlayerLoadResult {
   playMethod: PlaybackMode
 }
 
+export interface PlayerVideoBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type PlayerEngineId = 'mpv-window' | 'libmpv-render'
+
+export type PlayerVideoOutputMode = 'external-window' | 'software-frame' | 'shared-texture'
+
+export interface PlayerDiagnostics {
+  engine: PlayerEngineId
+  videoOutput: PlayerVideoOutputMode
+  backend: string
+  hardwareDecode: boolean
+  zeroCopy: boolean
+  geometry?: string
+  frameSize?: {
+    width: number
+    height: number
+  }
+  note?: string
+}
+
 export type PlayerCommand =
   | { type: 'play' }
   | { type: 'pause' }
@@ -25,7 +50,9 @@ export type PlayerCommand =
   | { type: 'seek'; seconds: number }
   | { type: 'setAudioTrack'; index: number }
   | { type: 'setSubtitle'; index: number | null }
+  | { type: 'setVolume'; volume: number }
   | { type: 'setFrameSize'; width: number; height: number }
+  | ({ type: 'setVideoBounds' } & PlayerVideoBounds)
 
 export interface PlayerStatePush {
   timeSec: number

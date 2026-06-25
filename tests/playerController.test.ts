@@ -23,12 +23,23 @@ class FakeEngine implements PlayerEngine {
   seek = vi.fn()
   setAudioTrack = vi.fn()
   setSubtitle = vi.fn()
+  setVolume = vi.fn()
   setFrameSize = vi.fn()
+  setVideoBounds = vi.fn()
   dispose = vi.fn()
   private readonly handlers = new Map<PlayerEventName, Array<(s: PlayerStateEvent) => void>>()
 
   getCapabilities() {
     return MPV_CAPABILITIES
+  }
+  getDiagnostics() {
+    return {
+      engine: 'mpv-window' as const,
+      videoOutput: 'external-window' as const,
+      backend: 'mpv',
+      hardwareDecode: true,
+      zeroCopy: true,
+    }
   }
   async load(src: PlaybackSource) {
     this.loaded = src
@@ -203,11 +214,15 @@ describe('PlayerController', () => {
     controller.command({ type: 'seek', seconds: 42 })
     controller.command({ type: 'pause' })
     controller.command({ type: 'setSubtitle', index: null })
+    controller.command({ type: 'setVolume', volume: 0.42 })
     controller.command({ type: 'setFrameSize', width: 1440, height: 900 })
+    controller.command({ type: 'setVideoBounds', x: 20, y: 30, width: 1280, height: 720 })
     expect(engine.seek).toHaveBeenCalledWith(42)
     expect(engine.pause).toHaveBeenCalled()
     expect(engine.setSubtitle).toHaveBeenCalledWith(null)
+    expect(engine.setVolume).toHaveBeenCalledWith(0.42)
     expect(engine.setFrameSize).toHaveBeenCalledWith(1440, 900)
+    expect(engine.setVideoBounds).toHaveBeenCalledWith({ x: 20, y: 30, width: 1280, height: 720 })
   })
 
   test('a failing progress report never breaks load', async () => {
@@ -221,6 +236,16 @@ describe('PlayerController', () => {
     const controller = new PlayerController(engine, emby, fakeDanmaku(), { send: () => {} })
     await expect(controller.load({ serverId: 'srv', itemId: 'i' })).resolves.toMatchObject({
       danmakuCount: 1,
+    })
+  })
+
+  test('diagnostics expose the active engine output mode', () => {
+    const { controller } = harness()
+
+    expect(controller.getDiagnostics()).toMatchObject({
+      engine: 'mpv-window',
+      videoOutput: 'external-window',
+      backend: 'mpv',
     })
   })
 })

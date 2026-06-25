@@ -28,6 +28,7 @@ import type {
 import type { ProviderInfo } from '../main/danmaku/ProviderRegistry'
 import type {
   PlayerCommand,
+  PlayerDiagnostics,
   PlayerLoadRequest,
   PlayerLoadResult,
   PlayerStatePush,
@@ -122,6 +123,8 @@ const playerApi = {
     ipcRenderer.invoke(CH.PLAYER_LOAD, req),
   command: (cmd: PlayerCommand): Promise<IpcResult<void>> =>
     ipcRenderer.invoke(CH.PLAYER_CMD, cmd),
+  diagnostics: (): Promise<IpcResult<PlayerDiagnostics>> =>
+    ipcRenderer.invoke(CH.PLAYER_DIAGNOSTICS),
   /** Subscribe to pushed playback state; returns an unsubscribe function. */
   onState: (cb: (state: PlayerStatePush) => void): (() => void) => {
     const handler = (_e: unknown, state: PlayerStatePush) => cb(state)
@@ -145,6 +148,9 @@ const windowApi = {
   },
   toggleMaximize: (): void => {
     ipcRenderer.send(CH.WINDOW_TOGGLE_MAXIMIZE)
+  },
+  toggleFullscreen: (): void => {
+    ipcRenderer.send(CH.WINDOW_TOGGLE_FULLSCREEN)
   },
 }
 

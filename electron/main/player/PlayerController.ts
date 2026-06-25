@@ -1,6 +1,7 @@
 import { TICKS_PER_SECOND, type PlaybackSource, type ProgressReport } from '@shared/types/emby'
 import type {
   PlayerCommand,
+  PlayerDiagnostics,
   PlayerLoadRequest,
   PlayerLoadResult,
   PlayerStatePush,
@@ -128,10 +129,25 @@ export class PlayerController {
       case 'setSubtitle':
         this.engine.setSubtitle(cmd.index)
         break
+      case 'setVolume':
+        this.engine.setVolume?.(cmd.volume)
+        break
       case 'setFrameSize':
         this.engine.setFrameSize?.(cmd.width, cmd.height)
         break
+      case 'setVideoBounds':
+        this.engine.setVideoBounds?.({
+          x: cmd.x,
+          y: cmd.y,
+          width: cmd.width,
+          height: cmd.height,
+        })
+        break
     }
+  }
+
+  getDiagnostics(): PlayerDiagnostics {
+    return this.engine.getDiagnostics()
   }
 
   /** Stop reporting + tear down the engine (app quit / view change). */

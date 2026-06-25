@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { TICKS_PER_SECOND, type PlaybackSource } from '@shared/types/emby'
+import type { PlayerDiagnostics } from '@shared/types/player'
 import {
   MPV_CAPABILITIES,
   type PlayerCapabilities,
@@ -8,6 +9,16 @@ import {
   type PlayerStateEvent,
   type PlayerVideoFrameEvent,
 } from './PlayerEngine'
+import {
+  normalizeSoftwareFrameSize,
+  resolveLibmpvRenderTuning,
+  type LibmpvRenderTuning,
+} from './libmpvRenderTuning'
+import {
+  resolveLibmpvRenderBackend,
+  type LibmpvNativeBackendReport,
+  type ResolvedLibmpvRenderBackend,
+} from './libmpvRenderBackend'
 
 interface NativePlayerState {
   timeSec: number
@@ -30,6 +41,7 @@ interface NativePlayer {
   seek(seconds: number): void
   setAudioTrack(index: number): void
   setSubtitle(index: number | null): void
+  setVolume(volume: number): void
   addSubtitle(path: string): void
   renderFrame(width: number, height: number): NativeRenderedFrame
   getState(): NativePlayerState
@@ -38,19 +50,20 @@ interface NativePlayer {
 
 interface NativeModule {
   Player: new () => NativePlayer
+  getRenderBackendReport(): LibmpvNativeBackendReport
 }
 
 export interface LibmpvRenderEngineOptions {
   width?: number
   height?: number
+  targetFps?: number
+  maxPixels?: number
   frameIntervalMs?: number
   stateIntervalMs?: number
 }
 
 const require = createRequire(import.meta.url)
 let nativeModule: NativeModule | null = null
-const MAX_RENDER_WIDTH = 1920
-const MAX_RENDER_HEIGHT = 1080
 
 /**
  * L3 prototype: libmpv render API → software RGBA frames → Electron canvas.
@@ -64,9 +77,12 @@ export class LibmpvRenderEngine implements PlayerEngine {
   private readonly frameListeners: Array<(f: PlayerVideoFrameEvent) => void> = []
   private width: number
   private height: number
+  private readonly tuning: LibmpvRenderTuning
   private readonly frameIntervalMs: number
   private readonly stateIntervalMs: number
+  private backend: ResolvedLibmpvRenderBackend | undefined
   private player: NativePlayer | null = null
+  private volume = 1
   private frameTimer: NodeJS.Timeout | undefined
   private stateTimer: NodeJS.Timeout | undefined
   private loaded = false
@@ -79,14 +95,36 @@ export class LibmpvRenderEngine implements PlayerEngine {
   }
 
   constructor(opts: LibmpvRenderEngineOptions = {}) {
-    this.width = opts.width ?? 1280
-    this.height = opts.height ?? 720
-    this.frameIntervalMs = opts.frameIntervalMs ?? 66
+    this.tuning = resolveLibmpvRenderTuning({
+      DMEMBY_L3_TARGET_FPS: process.env.DMEMBY_L3_TARGET_FPS,
+      DMEMBY_L3_MAX_PIXELS: process.env.DMEMBY_L3_MAX_PIXELS,
+      targetFps: opts.targetFps,
+      maxPixels: opts.maxPixels,
+    })
+    const initialSize = normalizeSoftwareFrameSize(opts.width ?? 1280, opts.height ?? 720, this.tuning)
+    this.width = initialSize.width
+    this.height = initialSize.height
+    this.frameIntervalMs = opts.frameIntervalMs ?? this.tuning.frameIntervalMs
     this.stateIntervalMs = opts.stateIntervalMs ?? 250
   }
 
   getCapabilities(): PlayerCapabilities {
     return { ...MPV_CAPABILITIES, hardwareDecode: false }
+  }
+
+  getDiagnostics(): PlayerDiagnostics {
+    return {
+      engine: 'libmpv-render',
+      videoOutput: 'software-frame',
+      backend: this.backend?.id ?? 'software',
+      hardwareDecode: false,
+      zeroCopy: false,
+      frameSize: {
+        width: this.width,
+        height: this.height,
+      },
+      note: 'libmpv renders RGBA frames that are copied through Main → Renderer IPC into a canvas.',
+    }
   }
 
   async load(src: PlaybackSource): Promise<void> {
@@ -124,8 +162,13 @@ export class LibmpvRenderEngine implements PlayerEngine {
     this.player?.setSubtitle(index)
   }
 
+  setVolume(volume: number): void {
+    this.volume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
+    this.player?.setVolume(this.volume)
+  }
+
   setFrameSize(width: number, height: number): void {
-    const next = normalizeFrameSize(width, height)
+    const next = normalizeSoftwareFrameSize(width, height, this.tuning)
     if (next.width === this.width && next.height === this.height) return
     this.width = next.width
     this.height = next.height
@@ -161,7 +204,14 @@ export class LibmpvRenderEngine implements PlayerEngine {
   private connect(): void {
     if (this.player) return
     const mod = loadNativeModule()
+    this.backend = resolveLibmpvRenderBackend(mod.getRenderBackendReport(), {
+      DMEMBY_L3_RENDER_BACKEND: process.env.DMEMBY_L3_RENDER_BACKEND,
+    })
+    if (this.backend.id !== 'software') {
+      throw new Error(`L3 render backend ${this.backend.id} is selected but not implemented in LibmpvRenderEngine yet`)
+    }
     this.player = new mod.Player()
+    this.player.setVolume(this.volume)
     this.frameTimer = setInterval(() => this.renderFrame(), this.frameIntervalMs)
     this.stateTimer = setInterval(() => this.pollState(), this.stateIntervalMs)
   }
@@ -223,16 +273,4 @@ function loadNativeModule(): NativeModule {
     nativeModule = require('@danmaku-emby/mpv-render') as NativeModule
   }
   return nativeModule
-}
-
-function normalizeFrameSize(width: number, height: number): { width: number; height: number } {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return { width: 1280, height: 720 }
-  }
-
-  const scale = Math.min(1, MAX_RENDER_WIDTH / width, MAX_RENDER_HEIGHT / height)
-  return {
-    width: Math.max(320, Math.round(width * scale)),
-    height: Math.max(180, Math.round(height * scale)),
-  }
 }

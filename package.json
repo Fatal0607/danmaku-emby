@@ -13,8 +13,10 @@
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3 -w @danmaku-emby/mpv-render",
     "rebuild:node": "npm rebuild better-sqlite3 @danmaku-emby/mpv-render",
     "electron:dev": "vite build && npm run build:electron && npm run rebuild:electron && electron .",
-    "electron:dev:l3": "DMEMBY_PLAYER_ENGINE=libmpv-render npm run electron:dev",
-    "electron:dev:mpv-window": "DMEMBY_PLAYER_ENGINE=mpv-window npm run electron:dev",
+    "electron:dev:gpu": "DMEMBY_PLAYER_ENGINE=mpv-window npm run electron:dev",
+    "electron:dev:single-window": "DMEMBY_PLAYER_ENGINE=single-window npm run electron:dev",
+    "electron:dev:l3": "npm run electron:dev:single-window",
+    "electron:dev:mpv-window": "npm run electron:dev:gpu",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

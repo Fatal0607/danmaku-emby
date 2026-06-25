@@ -10,6 +10,15 @@
       "libraries": [
         "<!(brew --prefix mpv 2>/dev/null || echo /opt/homebrew/opt/mpv)/lib/libmpv.dylib"
       ],
+      "conditions": [
+        ["OS=='mac'", {
+          "libraries": [
+            "-framework OpenGL",
+            "-framework CoreFoundation"
+          ],
+          "defines": ["GL_SILENCE_DEPRECATION"]
+        }]
+      ],
       "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS"],
       "cflags_cc!": ["-fno-exceptions"],
       "xcode_settings": {

@@ -1,4 +1,5 @@
 import type { PlaybackSource } from '@shared/types/emby'
+import type { PlayerDiagnostics, PlayerVideoBounds } from '@shared/types/player'
 
 // Player engine abstraction (docs 03 §3.3). MVP ships MpvEngine; Html5Engine is
 // a downgrade path. Business code and UI never depend on the concrete engine.
@@ -30,6 +31,7 @@ export type PlayerEventName = 'timeupdate' | 'ended' | 'pause' | 'play' | 'error
 
 export interface PlayerEngine {
   getCapabilities(): PlayerCapabilities
+  getDiagnostics(): PlayerDiagnostics
   load(src: PlaybackSource): Promise<void>
   play(): void
   pause(): void
@@ -37,7 +39,9 @@ export interface PlayerEngine {
   seek(seconds: number): void
   setAudioTrack(index: number): void
   setSubtitle(index: number | null): void
+  setVolume?(volume: number): void
   setFrameSize?(width: number, height: number): void
+  setVideoBounds?(bounds: PlayerVideoBounds): void
   /** mpv-only: load danmaku as an ASS overlay (html5 implements as no-op). */
   loadAssOverlay?(assText: string): void
   on(event: PlayerEventName, cb: (payload: PlayerStateEvent) => void): void

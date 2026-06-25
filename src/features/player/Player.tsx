@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { DanmakuMatchInput } from '@shared/types/danmaku'
 import { TICKS_PER_SECOND } from '@shared/types/emby'
@@ -9,6 +9,7 @@ import { useUI } from '@/lib/store'
 import { catalog } from '@/lib/mockData'
 import { useCurrentServerId, useDanmakuTrack, useMediaItem } from '@/lib/queries'
 import { PROVIDER_LABELS, trackToComments } from '@/lib/danmaku'
+import { getApi } from '@/lib/ipc'
 import { getPlayerSource } from '@/lib/playerSource'
 import { DanmakuLayer } from './DanmakuLayer'
 import { DanmakuSettings } from './DanmakuSettings'
@@ -27,6 +28,10 @@ function fmt(sec: number) {
 function clampTime(sec: number, duration: number) {
   const max = duration > 0 ? duration : Number.MAX_SAFE_INTEGER
   return Math.max(0, Math.min(max, sec))
+}
+
+function clampVolume(volume: number) {
+  return Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
 }
 
 function messageOf(e: unknown): string {
@@ -112,6 +117,13 @@ export function Player() {
 
   useEffect(() => {
     if (!isRealPlayer) return
+    playerSource.command({ type: 'setVolume', volume }).catch((e) => setPlaybackError(messageOf(e)))
+    // Send the initial slider value once; later changes go through setPlayerVolume.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRealPlayer, playerSource])
+
+  useEffect(() => {
+    if (!isRealPlayer) return
     return playerSource.onFrame((frame) => {
       if (drawVideoFrame(videoCanvasRef.current, frame)) setHasVideoFrame(true)
     })
@@ -122,8 +134,18 @@ export function Player() {
     const stage = playerStageRef.current
     if (!stage) return
 
-    const sendFrameSize = () => {
+    const syncVideoSurface = () => {
       const rect = stage.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+
+      playerSource.command({
+        type: 'setVideoBounds',
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }).catch(() => {})
+
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       const width = Math.round(rect.width * dpr)
       const height = Math.round(rect.height * dpr)
@@ -135,13 +157,15 @@ export function Player() {
       playerSource.command({ type: 'setFrameSize', width, height }).catch(() => {})
     }
 
-    sendFrameSize()
-    const observer = new ResizeObserver(sendFrameSize)
+    syncVideoSurface()
+    const observer = new ResizeObserver(syncVideoSurface)
     observer.observe(stage)
-    window.addEventListener('resize', sendFrameSize)
+    window.addEventListener('resize', syncVideoSurface)
+    const interval = window.setInterval(syncVideoSurface, 1000)
     return () => {
       observer.disconnect()
-      window.removeEventListener('resize', sendFrameSize)
+      window.removeEventListener('resize', syncVideoSurface)
+      window.clearInterval(interval)
     }
   }, [isRealPlayer, playerSource])
 
@@ -272,12 +296,38 @@ export function Player() {
     if (cmd.type === 'play') setPlaying(true)
     if (cmd.type === 'pause') setPlaying(false)
     if (cmd.type === 'seek') setTime(clampTime(cmd.seconds, duration))
+    if (cmd.type === 'setVolume') setVolume(clampVolume(cmd.volume))
 
     if (!isRealPlayer) return
     playerSource.command(cmd).catch((e) => setPlaybackError(messageOf(e)))
   }
 
   const togglePlaying = () => commandPlayer({ type: playing ? 'pause' : 'play' })
+
+  const setPlayerVolume = (nextVolume: number) => {
+    commandPlayer({ type: 'setVolume', volume: clampVolume(nextVolume) })
+  }
+
+  const toggleFullscreen = () => {
+    if (isRealPlayer) {
+      try {
+        getApi().window.toggleFullscreen()
+      } catch (e) {
+        setPlaybackError(messageOf(e))
+      }
+      return
+    }
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch((e: unknown) => setPlaybackError(messageOf(e)))
+      return
+    }
+
+    const target = playerStageRef.current ?? document.documentElement
+    if (target.requestFullscreen) {
+      void target.requestFullscreen().catch((e: unknown) => setPlaybackError(messageOf(e)))
+    }
+  }
 
   // Auto-hide chrome after inactivity while playing.
   const wake = () => {
@@ -388,12 +438,17 @@ export function Player() {
             </button>
             <div className="ctrl-volume">
               <Icon name="volume" size={18} color="var(--text-soft)" />
-              <div className="volume-track" onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect()
-                setVolume(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)))
-              }}>
-                <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
-              </div>
+              <input
+                className="volume-slider"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                aria-label={`音量 ${Math.round(volume * 100)}%`}
+                onChange={(e) => setPlayerVolume(Number(e.currentTarget.value))}
+                style={{ '--volume-percent': `${volume * 100}%` } as CSSProperties}
+              />
             </div>
           </div>
 
@@ -415,7 +470,7 @@ export function Player() {
             >
               <Icon name="settings" size={18} color={showSettings ? 'var(--accent-bright)' : 'var(--text-soft)'} />
             </button>
-            <button className="ctrl" aria-label="全屏">
+            <button className="ctrl" onClick={toggleFullscreen} aria-label="全屏">
               <Icon name="fullscreen" size={18} color="var(--text-soft)" />
             </button>
           </div>

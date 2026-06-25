@@ -32,6 +32,7 @@ export const CH = {
   WINDOW_CLOSE: 'window:close',
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_TOGGLE_MAXIMIZE: 'window:toggleMaximize',
+  WINDOW_TOGGLE_FULLSCREEN: 'window:toggleFullscreen',
   // Emby
   EMBY_ADD_SERVER: 'emby:addServer',
   EMBY_LIST_SERVERS: 'emby:listServers',
@@ -51,6 +52,7 @@ export const CH = {
   // Player (push events use webContents.send)
   PLAYER_LOAD: 'player:load',
   PLAYER_CMD: 'player:cmd',
+  PLAYER_DIAGNOSTICS: 'player:diagnostics',
   PLAYER_STATE: 'player:state',
   PLAYER_FRAME: 'player:frame',
   // Danmaku

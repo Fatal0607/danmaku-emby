@@ -9,9 +9,25 @@ This repo implements the high-fidelity design `DanmakuEmby.dc.html` (cinema-dark
 ```bash
 npm install          # builds the better-sqlite3 native module
 npm run dev          # Vite dev server (browser preview, mock data)
-npm run electron:dev # build + launch the Electron window
+npm run electron:dev # build + launch Electron with the GPU mpv player
+npm run electron:dev:l3 # opt-in software-frame libmpv render prototype
 npm run build        # typecheck + production bundle
 npm test             # Vitest unit suite (Main-process modules)
+```
+
+The opt-in L3 software-frame prototype targets 60fps by default while capping
+its RGBA render surface to a 720p pixel budget. For diagnostics you can tune it:
+
+```bash
+DMEMBY_L3_TARGET_FPS=30 npm run electron:dev:l3
+DMEMBY_L3_MAX_PIXELS=2073600 npm run electron:dev:l3 # 1080p software frames
+DMEMBY_L3_RENDER_BACKEND=opengl npm run electron:dev:l3 # probe/fallback path; not wired yet
+```
+
+The native addon also has an opt-in OpenGL FBO smoke test:
+
+```bash
+MPV_RENDER_OPENGL_SMOKE=1 npx vitest run tests/smoke/mpvRenderOpenGL.smoke.test.ts
 ```
 
 A live platform smoke test (`tests/smoke/`) is skipped unless real credentials are passed via
@@ -66,7 +82,8 @@ electron/main/
 ├── net/FetchLike.ts          # injectable network layer
 ├── player/
 │   ├── PlayerEngine.ts       # engine interface + mpv/html5 capability sets
-│   └── MpvEngine.ts          # libmpv binding site (Spike A — not yet native)
+│   ├── MpvEngine.ts          # GPU mpv window engine (default high-performance path)
+│   └── LibmpvRenderEngine.ts # software RGBA frame prototype (opt-in)
 ├── danmaku/
 │   ├── DanmakuService.ts     # orchestration: auto-match → cache-first fetch → toAss
 │   ├── MatchService.ts       # /match + mapping memory (manual wins) + episode extrapolation
@@ -103,7 +120,8 @@ provide caching, loading, and error states.
 | Danmaku Phase 2: dandanplay provider + MatchService + DanmakuService (cache, manual-wins, toAss) | ✅ implemented, unit-tested |
 | Danmaku Phase 3: bilibili provider (WBI signing, XML decoder) | ✅ implemented, unit-tested (WBI verified vs live nav) |
 | Multi-provider registry (dandanplay + bilibili routed by priority/id) | ✅ implemented, unit-tested |
-| libmpv native binding (Spike A, docs 07 §7.2) | ⬜ next |
+| GPU mpv player path (hardware decode, no RGBA frame IPC) | ✅ default |
+| libmpv native software-frame prototype | ✅ opt-in via `npm run electron:dev:l3` (60fps target, 720p software budget) |
 | dandanplay live (needs AppId signing or self-hosted proxy — official returns 403 unsigned) | ⬜ needs credentials |
 | 腾讯 provider + manifest hot-update | ⬜ later |
 | Danmaku network stack (dandanplay/B站/腾讯, manifest) | ⬜ Phase 2–3 |

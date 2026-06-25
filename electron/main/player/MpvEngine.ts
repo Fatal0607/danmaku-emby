@@ -9,11 +9,18 @@ import {
   type PlayerEventName,
   type PlayerStateEvent,
 } from './PlayerEngine'
+import type { PlayerDiagnostics } from '@shared/types/player'
 import { MpvIpcClient, type MpvIpcOptions } from './mpv/MpvIpcClient'
 import type { MpvEvent } from './mpv/protocol'
+import { formatMpvGeometry, type VideoBounds } from './videoBounds'
 
 // Observed-property ids (docs 03 §3.4): mpv echoes these back on property-change.
 const OBSERVE = { TIME: 1, DURATION: 2, PAUSE: 3, EOF: 4 } as const
+
+export function toMpvVolumePercent(volume: number): number {
+  const normalized = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
+  return Math.round(normalized * 10_000) / 100
+}
 
 export interface MpvVideoWindowBounds {
   x: number
@@ -39,6 +46,10 @@ export interface MpvEngineOptions extends Omit<MpvIpcOptions, 'extraArgs'> {
 export class MpvEngine implements PlayerEngine {
   private readonly client: MpvIpcClient
   private readonly listeners = new Map<PlayerEventName, Array<(p: PlayerStateEvent) => void>>()
+  private readonly getInitialVideoWindowBounds?: () => MpvVideoWindowBounds | undefined
+  private videoWindowBounds: MpvVideoWindowBounds | undefined
+  private videoWindowGeometry: string | undefined
+  private volume = 1
   private connected = false
   private state: PlayerStateEvent = {
     timeSec: 0,
@@ -48,13 +59,14 @@ export class MpvEngine implements PlayerEngine {
   }
 
   constructor(opts: MpvEngineOptions = {}) {
+    this.getInitialVideoWindowBounds = opts.getVideoWindowBounds
     // hwdec first so a caller-supplied --hwdec (e.g. headless tests) wins by
     // mpv's last-flag-wins rule.
     this.client = new MpvIpcClient({
       ...opts,
       extraArgs: () => [
         ...buildMpvWindowArgs({
-          bounds: opts.getVideoWindowBounds?.(),
+          bounds: this.videoWindowBounds ?? this.getInitialVideoWindowBounds?.(),
           embedWindowId: opts.getEmbedWindowId?.(),
         }),
         ...(typeof opts.extraArgs === 'function' ? opts.extraArgs() : (opts.extraArgs ?? [])),
@@ -64,6 +76,18 @@ export class MpvEngine implements PlayerEngine {
 
   getCapabilities(): PlayerCapabilities {
     return MPV_CAPABILITIES
+  }
+
+  getDiagnostics(): PlayerDiagnostics {
+    return {
+      engine: 'mpv-window',
+      videoOutput: 'external-window',
+      backend: 'mpv',
+      hardwareDecode: true,
+      zeroCopy: true,
+      geometry: this.videoWindowGeometry,
+      note: 'mpv owns the native video window; Electron renders controls and HTML danmaku separately.',
+    }
   }
 
   /** Launch mpv and subscribe to the properties that drive playback state. */
@@ -76,6 +100,7 @@ export class MpvEngine implements PlayerEngine {
     await this.client.observeProperty(OBSERVE.DURATION, 'duration')
     await this.client.observeProperty(OBSERVE.PAUSE, 'pause')
     await this.client.observeProperty(OBSERVE.EOF, 'eof-reached')
+    await this.client.setProperty('volume', toMpvVolumePercent(this.volume))
     this.connected = true
   }
 
@@ -107,6 +132,21 @@ export class MpvEngine implements PlayerEngine {
 
   setSubtitle(index: number | null): void {
     void this.client.setProperty('sid', index == null ? 'no' : index)
+  }
+
+  setVolume(volume: number): void {
+    this.volume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1
+    if (!this.connected) return
+    void this.client.setProperty('volume', toMpvVolumePercent(this.volume))
+  }
+
+  setVideoBounds(bounds: VideoBounds): void {
+    this.videoWindowBounds = bounds
+    const geometry = formatMpvGeometry(bounds)
+    if (geometry === this.videoWindowGeometry) return
+    this.videoWindowGeometry = geometry
+    if (!this.connected) return
+    void this.client.setProperty('geometry', geometry)
   }
 
   /** Write the danmaku ASS to a temp file and load it as a selected sub track. */
@@ -195,9 +235,5 @@ export function buildMpvWindowArgs(options: MpvWindowArgsOptions = {}): string[]
   const bounds = options.bounds
   if (!bounds) return [...fallbackArgs, '--autofit-larger=1280x720', '--geometry=50%:50%']
 
-  const width = Math.max(320, Math.round(bounds.width))
-  const height = Math.max(180, Math.round(bounds.height))
-  // macOS mpv's absolute +x+y geometry is less reliable across spaces/displays.
-  // Size the L1/L2 video window to the Electron overlay and let mpv center it.
-  return [...fallbackArgs, `--autofit-larger=${width}x${height}`, '--geometry=50%:50%']
+  return [...fallbackArgs, `--geometry=${formatMpvGeometry(bounds)}`]
 }
